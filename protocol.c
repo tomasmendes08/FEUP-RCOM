@@ -26,7 +26,7 @@ int sendMessageSET(int fd){
         perror("Writing SET message");
         exit(-1);
     }
-
+    
     printf("SET: %s\n", message);
     return result;
 }
@@ -197,11 +197,6 @@ int llopen_transmitter(char * port){
 
     int ua_received = verifyFrame(ua_message, UA);
 
-    if(ua_received != 0){
-        perror("UA message must have length equal to 5");
-        exit(-1);
-    }
-
     return fd;
 }
 
@@ -251,11 +246,6 @@ int llopen_receiver(char * port){
     }
 
     int set_received = verifyFrame(set_message, SET);
-
-    if(set_received != 0){
-        perror("SET message must have length equal to 5..\n");
-        exit(-1);
-    }
 
     int result = sendMessageUA(fd);
     printf("UA result: %d\n", result);
