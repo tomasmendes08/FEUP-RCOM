@@ -50,10 +50,45 @@ int sendMessageUA(int fd){
     return result;
 }
 
+int verifyFrame(char *message, int type){
+  if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
+    perror("Error in verifyFrame");
+    exit(-1);
+  }
+
+  switch (type)
+  {
+    case SET:
+      if(!(message[2]==SET_CTRL && message[3]==(A_ADRESS ^ SET_CTRL))){
+        perror("Error in verifyFrame (SET)");
+        exit(-1);
+      }
+      printf("SET received: %s\n", message);
+      break;
+    case UA:
+      if(!(message[2]==UA_CTRL && message[3]==(A_ADRESS ^ UA_CTRL))){
+        perror("Error in verifyFrame (UA)");
+        exit(-1);
+      }
+      printf("UA received: %s\n", message);
+      break;
+    case DISC:
+      if(!(message[2]==DISC_CTRL && message[3]==(A_ADRESS ^ DISC_CTRL))){
+        perror("Error in verifyFrame (DISC)");
+        exit(-1);
+      }
+      printf("DISC received: %s\n", message);
+      break;
+    default:
+      break;
+  }
+
+  return 0;
+}
+
 int stateMachine(int numChars, char *value){
-    size_t state;
-    for (state = 0; state < numChars; state++)
-    {
+    size_t state = 0;
+    while(state < numChars){
         switch (state)
         {
             case 0:
@@ -73,7 +108,7 @@ int stateMachine(int numChars, char *value){
                 break;
 
             case 2:
-                if(value[state] == UA_CTRL)
+                if(value[state] == UA_CTRL || value[state] == SET_CTRL)
                     state = 3;
                 else if (value[state] == FLAG)
                     state = 1;
@@ -95,7 +130,7 @@ int stateMachine(int numChars, char *value){
                     stop = TRUE;
                     //alarm(0);
                     printf("UA/SET received.\n");
-                    return 6;
+                    state = 5;
                 }
                 else
                     state = 0;
@@ -150,17 +185,15 @@ int llopen_transmitter(char * port){
     int result = sendMessageSET(fd);
     printf("SET result: %d\n", result);
 
-    char ua_message[6];
-    if(read(fd, ua_message, 6)==-1){
+    char ua_message[5];
+    if(read(fd, ua_message, 5)==-1){
         perror("Error reading UA from fd");
         exit(-1);
     }
 
-    int ua_received = stateMachine(6, ua_message);
+    int ua_received = verifyFrame(ua_message, UA);
 
-    printf("UA: %s\n", ua_message);
-
-    if(ua_received != 6){
+    if(ua_received != 0){
         perror("UA message must have length equal to 5");
         exit(-1);
     }
@@ -206,19 +239,17 @@ int llopen_receiver(char * port){
 
     printf("New termios structure set\n");
 
-    char set_message[6];
+    char set_message[5];
 
-    if(read(fd, set_message, 6)==-1){
+    if(read(fd, set_message, 5)==-1){
         perror("Error reading SET from fd");
         exit(-1);
     }
 
-    int set_received = stateMachine(6, set_message);
+    int set_received = verifyFrame(set_message, SET);
 
-    printf("SET: %s\n", set_message);
-
-    if(set_received != 6){
-        perror("SET message must have length equal to 5");
+    if(set_received != 0){
+        perror("SET message must have length equal to 5..\n");
         exit(-1);
     }
 

@@ -18,7 +18,7 @@ int main(int argc, char** argv)
     char buf[255];
     int i, sum = 0, speed = 0;
     
-    if ( (argc < 2) || 
+    if ( (argc < 3) || 
   	     ((strcmp("/dev/ttyS0", argv[1])!=0) && 
   	      (strcmp("/dev/ttyS1", argv[1])!=0) )) {
         printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0)\n\tex: nserial /dev/ttyS1 1\n");      

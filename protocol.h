@@ -10,17 +10,22 @@
 #define FALSE 0
 #define TRUE 1
 
+#define DISC_CTRL       0x11
 #define SET_CTRL        0x03
 #define A_ADRESS        0x03
 #define FLAG            0x7E
 #define UA_CTRL         0x07
 #define TRANSMITTER     1
 #define RECEIVER        0
-
+#define UA              0
+#define SET             1
+#define DISC            2
 
 int sendMessageSET(int fd);
 
 int sendMessageUA(int fd);
+
+int verifyFrame(char *message, int type);
 
 int stateMachine(int numChars, char *value);
 
