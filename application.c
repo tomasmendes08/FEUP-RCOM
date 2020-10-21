@@ -27,18 +27,18 @@ int main(int argc, char** argv)
 
     int arg = atoi(argv[2]);
     if(arg == TRANSMITTER)
-      fd = llopen(argv[1], TRANSMITTER);
+        fd = llopen(argv[1], TRANSMITTER);
     else if(arg == RECEIVER)
-      fd = llopen(argv[1], RECEIVER);
+        fd = llopen(argv[1], RECEIVER);
 
-  /* 
-    O ciclo FOR e as instru��es seguintes devem ser alterados de modo a respeitar 
-    o indicado no gui�o 
-  */
-   
+    /*
+      O ciclo FOR e as instru��es seguintes devem ser alterados de modo a respeitar
+      o indicado no gui�o
+    */
+
     if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
-      perror("tcsetattr");
-      exit(-1);
+        perror("tcsetattr");
+        exit(-1);
     }
 
     close(fd);

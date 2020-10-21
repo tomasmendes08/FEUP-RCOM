@@ -26,5 +26,4 @@ int stateMachine(int numChars, char *value);
 
 int llopen_transmitter(char * port);
 
-int llopen_receiver(char * port;
-
+int llopen_receiver(char * port);
