@@ -1,4 +1,4 @@
-#include "protocol.h"
+#include "protocol.c"
 
 int llopen(char *port, int status);
 

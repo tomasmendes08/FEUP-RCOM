@@ -15,6 +15,7 @@ struct termios oldtio, newtio;
 int sendMessageSET(int fd){
   char message[5];
 
+  printf("cheguei SET\n");
   message[0] = FLAG;
   message[1] = A_ADRESS;
   message[2] = SET_CTRL;
@@ -34,6 +35,8 @@ int sendMessageSET(int fd){
 int sendMessageUA(int fd){
   char message[5];
 
+  printf("cheguei UA\n");
+
   message[0] = FLAG;
   message[1] = A_ADRESS;
   message[2] = UA_CTRL;
@@ -51,57 +54,58 @@ int sendMessageUA(int fd){
 }
 
 int stateMachine(int numChars, char *value){
-  for (size_t state = 0; state < numChars; state++)
+  size_t state;
+  for ( state = 0; state < numChars; state++)
   {
     switch (state)
     {
-    case 0:
-      if(value[state] == FLAG)
-        state = 1;
-      else
-        state = 0;
-      break;
+      case 0:
+        if(value[state] == FLAG)
+          state = 1;
+        else
+          state = 0;
+        break;
 
-    case 1:
-      if(value[state] == A_ADRESS)
-        state = 2;
-      else if(value[state] == FLAG)
-        state = 1;
-      else
-        state = 0;
-      break;
+      case 1:
+        if(value[state] == A_ADRESS)
+          state = 2;
+        else if(value[state] == FLAG)
+          state = 1;
+        else
+          state = 0;
+        break;
 
-    case 2:
-      if(value[state] == UA_CTRL)
-        state = 3;
-      else if (value[state] == FLAG)
-        state = 1;
-      else
-        state = 0;
-      break;
+      case 2:
+        if(value[state] == UA_CTRL || value[state] == SET_CTRL)
+          state = 3;
+        else if (value[state] == FLAG)
+          state = 1;
+        else
+          state = 0;
+        break;
 
-    case 3:
-      if(value[state] == (A_ADRESS ^ UA_CTRL))
-        state = 4;
-      else if (value[state] == FLAG)
-        state = 1;
-      else
-        state = 0;
-      break;
+      case 3:
+        if(value[state] == (A_ADRESS ^ UA_CTRL))
+          state = 4;
+        else if (value[state] == FLAG)
+          state = 1;
+        else
+          state = 0;
+        break;
 
-    case 4:
-      if(value[state] == FLAG){
-        stop = TRUE;
-        //alarm(0);
-        printf("UA/SET received.\n");
-        return 6;
-      }
-      else
-        state = 0;
-      break;
+      case 4:
+        if(value[state] == FLAG){
+          stop = TRUE;
+          //alarm(0);
+          printf("UA/SET received.\n");
+          return 6;
+        }
+        else
+          state = 0;
+        break;
 
-    default:
-      break;
+      default:
+        break;
     }
   }
   
@@ -130,7 +134,7 @@ int llopen_transmitter(char * port){
   newtio.c_lflag = 0;
 
   newtio.c_cc[VTIME] = 2;   /* inter-character timer unused */
-  newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
+  newtio.c_cc[VMIN] = 1;   /* blocking read until 5 chars received */
 
 /* 
   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a 
@@ -189,7 +193,7 @@ int llopen_receiver(char * port){
   newtio.c_lflag = 0;
 
   newtio.c_cc[VTIME] = 2;   /* inter-character timer unused */
-  newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
+  newtio.c_cc[VMIN] = 1;   /* blocking read until 5 chars received */
 
 /* 
   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a 
