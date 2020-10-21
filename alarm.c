@@ -1,7 +1,9 @@
 #include <signal.h>
 #include "protocol.h"
 
-#define ALARM_TIME  3
+#define ALARM_TIME   3   
+#define MAX_TRIES    3
+
 int sendTries = 0;
 int alarmFlag = FALSE;
 

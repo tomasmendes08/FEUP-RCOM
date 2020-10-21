@@ -1,34 +1,56 @@
 /*Non-Canonical Input Processing*/
-#include "protocol.h"
+#include "alarm.c"
 
 int stop = FALSE;
-int alarm_flag = FALSE;
-int counter = 1;
 struct termios oldtio, newtio;
-
-/*void alarm_handler(){
-  printf("Alarm Counter = %d\n", counter);
-  counter++;
-  alarm_flag = TRUE;
-}*/
 
 int sendMessageSET(int fd){
     char message[5];
 
-    message[0] = FLAG;
-    message[1] = A_ADRESS;
-    message[2] = SET_CTRL;
-    message[3] = (A_ADRESS ^ SET_CTRL);
-    message[4] = FLAG;
+    do{
+      startAlarm();
 
-    int result = write(fd, message, 5);
-    if(result == -1){
-        perror("Writing SET message");
-        exit(-1);
-    }
+      message[0] = FLAG;
+      message[1] = A_ADRESS;
+      message[2] = SET_CTRL;
+      message[3] = (A_ADRESS ^ SET_CTRL);
+      message[4] = FLAG;
     
-    printf("SET: %s\n", message);
-    return result;
+      printf("SET: %s\n", message);
+
+      int result = write(fd, message, 5);
+      if(result == -1){
+          perror("Error writing SET message");
+          continue;
+      }
+
+      char ua_message[5];
+      if(read(fd, ua_message, 5)==-1){
+          perror("Error reading UA from fd");
+          continue;
+      }
+
+      if(verifyFrame(ua_message, UA)){
+          continue;
+      }
+      else{
+          alarmFlag=FALSE;
+          sendTries=0;
+          alarm(0);
+          printf("UA received: %s\n", ua_message);
+      }
+
+    } while(sendTries < MAX_TRIES && alarmFlag);
+
+    if(sendTries == MAX_TRIES){
+      sendTries = 0;
+      alarmFlag = FALSE; 
+
+      perror("Timed out too many times");
+      return 1;
+    }
+
+    return 0;
 }
 
 int sendMessageUA(int fd){
@@ -53,11 +75,11 @@ int sendMessageUA(int fd){
 int verifyFrame(char *message, int type){
   if(strlen(message) == 5){
       perror("Error in verifyFrame (MSG Size)");
-      exit(-1);
+      return 1;
   }
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
-    exit(-1);
+    return 1;
   }
 
   switch (type)
@@ -65,21 +87,21 @@ int verifyFrame(char *message, int type){
     case SET:
       if(!(message[2]==SET_CTRL && message[3]==(A_ADRESS ^ SET_CTRL))){
         perror("Error in verifyFrame (SET)");
-        exit(-1);
+        return 1;
       }
       printf("SET received: %s\n", message);
       break;
     case UA:
       if(!(message[2]==UA_CTRL && message[3]==(A_ADRESS ^ UA_CTRL))){
         perror("Error in verifyFrame (UA)");
-        exit(-1);
+        return 1;
       }
       printf("UA received: %s\n", message);
       break;
     case DISC:
       if(!(message[2]==DISC_CTRL && message[3]==(A_ADRESS ^ DISC_CTRL))){
         perror("Error in verifyFrame (DISC)");
-        exit(-1);
+        return 1;
       }
       printf("DISC received: %s\n", message);
       break;
@@ -186,16 +208,7 @@ int llopen_transmitter(char * port){
 
     printf("New termios structure set\n");
 
-    int result = sendMessageSET(fd);
-    printf("SET result: %d\n", result);
-
-    char ua_message[5];
-    if(read(fd, ua_message, 5)==-1){
-        perror("Error reading UA from fd");
-        exit(-1);
-    }
-
-    int ua_received = verifyFrame(ua_message, UA);
+    if(sendMessageSET(fd)) exit(-1);
 
     return fd;
 }
