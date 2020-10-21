@@ -51,6 +51,10 @@ int sendMessageUA(int fd){
 }
 
 int verifyFrame(char *message, int type){
+  if(strlen(message) == 5){
+      perror("Error in verifyFrame (MSG Size)");
+      exit(-1);
+  }
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
     exit(-1);
