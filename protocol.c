@@ -3,12 +3,18 @@
 
 int stop = FALSE;
 struct termios oldtio, newtio;
+LinkLayer linkLayer;
+int success;
+
+int setLinkLayerStruct(){
+    linkLayer.sequenceNumber = 0;
+    linkLayer.baudRate = BAUDRATE;
+}
 
 int sendMessageSET(int fd){
     char message[5];
 
     do{
-      startAlarm();
 
       message[0] = FLAG;
       message[1] = A_ADRESS;
@@ -23,6 +29,7 @@ int sendMessageSET(int fd){
           perror("Error writing SET message");
           continue;
       }
+      startAlarm();
 
       char ua_message[5];
       if(read(fd, ua_message, 5)==-1){
@@ -105,6 +112,30 @@ int verifyFrame(char *message, int type){
       }
       printf("DISC received: %s\n", message);
       break;
+    /*case RR:
+      if(message[2] != 0x85 || message[2] != 0x05){
+        perror("Error in verifyFrame (RR -> Control)");
+        return 1;
+      }
+      if(message[3] != (A_ADRESS ^ message[2])){
+        perror("Error in verifyFrame (RR -> XOR)");
+        return 1;
+      } 
+      success = 0;
+      printf("RR received: %s\n", message);
+      break;
+    case REJ:
+      if(message[2] != 0x81 || message[2] != 0x01){
+        perror("Error in verifyFrame (REJ -> Control)");
+        return 1;
+      }
+      if(message[3] != (A_ADRESS ^ message[2])){
+        perror("Error in verifyFrame (REJ -> XOR)");
+        return 1;
+      } 
+      success = 1;
+      printf("REJ received: %s\n", message);
+      break;*/
     default:
       break;
   }
@@ -264,4 +295,68 @@ int llopen_receiver(char * port){
     printf("UA result: %d\n", result);
 
     return fd;
+}
+
+int writeFrameI(int fd, unsigned char *buffer, int length){
+    int max_length = 2 * length + 6;
+    unsigned char frame[max_length];
+
+    frame[0] = FLAG;
+    frame[1] = A_ADRESS;
+    
+    if(linkLayer.sequenceNumber == 0) frame[2] = FI_CTRL0;
+    else if(linkLayer.sequenceNumber == 1) frame[2] = FI_CTRL1;
+
+    frame[3] = (frame[1] ^ frame[2]);
+    
+    unsigned char bcc2 = 0x00;
+
+    for(int j = 0; j < length; j++){
+        bcc2 ^= buffer[j];
+    }
+    
+    int i = 0;
+    for(i; i < length; i++){
+        if(buffer[i] == FLAG || buffer[i] == ESC){
+            frame[i+4] = ESC;
+            frame[i+5] = buffer[i] ^ STUFF;
+        }
+        else{
+            frame[i+4] = buffer[i];
+        }
+    }
+
+    if(bcc2 == FLAG || bcc2 == ESC){
+        frame[i + 4] = ESC;
+        frame[i + 5] = bcc2 ^ STUFF;
+        i+=2;
+    }
+    else{
+        frame[i+4] = bcc2;
+        i++;
+    }
+
+    frame[i+4] = FLAG;
+    if(write(fd, frame, i+4) == -1){
+        perror("Error writing to fd");
+        exit(-1);
+    }
+
+    printf("Frame: %s\n Frame size; %d\n", frame, i+4);
+    return frame;
+}
+
+int llwrite(int fd, unsigned char *buffer, int length){
+    printf("llwrite starting\n");
+    
+    do
+    {
+        writeFrameI(fd, buffer, length);
+        startAlarm();
+        
+        int result = verifyRRREJ(buffer);
+        if()
+        
+    } while (sendTries < MAX_TRIES && alarmFlag);
+    
 }

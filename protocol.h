@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <termios.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
@@ -20,6 +21,23 @@
 #define UA              0
 #define SET             1
 #define DISC            2
+#define RR              3
+#define REJ             4
+#define FI_CTRL0        0x00
+#define FI_CTRL1        0x40
+#define ESC             0x7D
+#define STUFF           0x20
+
+typedef struct{
+
+    int baudRate;                   /*Velocidade de transmissão*/
+    unsigned int sequenceNumber;
+
+}LinkLayer
+
+extern LinkLayer linkLayer;
+
+int setLinkLayerStruct();
 
 int sendMessageSET(int fd);
 
@@ -32,3 +50,7 @@ int stateMachine(int numChars, char *value);
 int llopen_transmitter(char * port);
 
 int llopen_receiver(char * port);
+
+int llwrite(int fd, unsigned char *buffer, int length);
+
+int writeFrameI(int fd, unsigned char *buffer, int length);
