@@ -73,7 +73,7 @@ int sendMessageUA(int fd){
 }
 
 int verifyFrame(char *message, int type){
-  if(strlen(message) == 5){
+  if(strlen(message) != 5){
       perror("Error in verifyFrame (MSG Size)");
       return 1;
   }
@@ -112,7 +112,7 @@ int verifyFrame(char *message, int type){
   return 0;
 }
 
-int stateMachine(int numChars, char *value){
+/*int stateMachine(int numChars, char *value){
     size_t state = 0;
     while(state < numChars){
         switch (state)
@@ -168,7 +168,7 @@ int stateMachine(int numChars, char *value){
     }
 
     return state;
-}
+}*/
 
 int llopen_transmitter(char * port){
 
@@ -191,7 +191,7 @@ int llopen_transmitter(char * port){
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 2;   /* inter-character timer unused */
+    newtio.c_cc[VTIME] = 0;   /* inter-character timer unused */
     newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
 
 /*
@@ -234,7 +234,7 @@ int llopen_receiver(char * port){
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 2;   /* inter-character timer unused */
+    newtio.c_cc[VTIME] = 0;   /* inter-character timer unused */
     newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
 
 /*
