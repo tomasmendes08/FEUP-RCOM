@@ -265,4 +265,3 @@ int llopen_receiver(char * port){
 
     return fd;
 }
-
