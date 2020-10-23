@@ -1,9 +1,12 @@
+#pragma once
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <termios.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
@@ -21,8 +24,7 @@
 #define UA              0
 #define SET             1
 #define DISC            2
-#define RR              3
-#define REJ             4
+#define DATA_CTRL       3
 #define FI_CTRL0        0x00
 #define FI_CTRL1        0x40
 #define ESC             0x7D
@@ -33,9 +35,7 @@ typedef struct{
     int baudRate;                   /*Velocidade de transmissão*/
     unsigned int sequenceNumber;
 
-}LinkLayer
-
-extern LinkLayer linkLayer;
+}LinkLayer;
 
 int setLinkLayerStruct();
 

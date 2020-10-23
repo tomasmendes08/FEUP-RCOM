@@ -1,15 +1,13 @@
-/*Non-Canonical Input Processing*/
 #include "alarm.c"
 
 int stop = FALSE;
-struct termios oldtio, newtio;
-LinkLayer linkLayer;
-int success;
+//LinkLayer linkLayer;
+int success = 2;
 
-int setLinkLayerStruct(){
+/*int setLinkLayerStruct(){
     linkLayer.sequenceNumber = 0;
     linkLayer.baudRate = BAUDRATE;
-}
+}*/
 
 int sendMessageSET(int fd){
     char message[5];
@@ -44,7 +42,6 @@ int sendMessageSET(int fd){
           alarmFlag=FALSE;
           sendTries=0;
           alarm(0);
-          printf("UA received: %s\n", ua_message);
       }
 
     } while(sendTries < MAX_TRIES && alarmFlag);
@@ -80,10 +77,7 @@ int sendMessageUA(int fd){
 }
 
 int verifyFrame(char *message, int type){
-  if(strlen(message) != 5){
-      perror("Error in verifyFrame (MSG Size)");
-      return 1;
-  }
+  
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
     return 1;
@@ -112,38 +106,34 @@ int verifyFrame(char *message, int type){
       }
       printf("DISC received: %s\n", message);
       break;
-    /*case RR:
-      if(message[2] != 0x85 || message[2] != 0x05){
+    case DATA_CTRL:     //RR or REJ
+      if(message[2] != 0x85 && message[2] != 0x05){
         perror("Error in verifyFrame (RR -> Control)");
         return 1;
       }
-      if(message[3] != (A_ADRESS ^ message[2])){
-        perror("Error in verifyFrame (RR -> XOR)");
-        return 1;
-      } 
-      success = 0;
-      printf("RR received: %s\n", message);
-      break;
-    case REJ:
-      if(message[2] != 0x81 || message[2] != 0x01){
+      else success = 3;
+
+      if(message[2] != 0x81 && message[2] != 0x01){
         perror("Error in verifyFrame (REJ -> Control)");
         return 1;
       }
+      else success = 4;
+
       if(message[3] != (A_ADRESS ^ message[2])){
-        perror("Error in verifyFrame (REJ -> XOR)");
+        perror("Error in verifyFrame (RR / REJ -> XOR)");
         return 1;
       } 
-      success = 1;
-      printf("REJ received: %s\n", message);
-      break;*/
+      
+      return success;
+      break;
     default:
       break;
   }
 
   return 0;
 }
-
-/*int stateMachine(int numChars, char *value){
+/*
+int stateMachine(int numChars, char *value){
     size_t state = 0;
     while(state < numChars){
         switch (state)
@@ -199,9 +189,11 @@ int verifyFrame(char *message, int type){
     }
 
     return state;
-}*/
-
+}
+*/
 int llopen_transmitter(char * port){
+
+    struct termios oldtio, newtio;
 
     int fd = open(port, O_RDWR | O_NOCTTY);
     if(fd == -1){
@@ -222,7 +214,7 @@ int llopen_transmitter(char * port){
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 0;   /* inter-character timer unused */
+    newtio.c_cc[VTIME] = 1;   /* inter-character timer unused */
     newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
 
 /*
@@ -246,6 +238,8 @@ int llopen_transmitter(char * port){
 
 int llopen_receiver(char * port){
 
+    struct termios oldtio, newtio;
+
     int fd = open(port, O_RDWR | O_NOCTTY);
     if(fd == -1){
         perror("Port error");
@@ -265,7 +259,7 @@ int llopen_receiver(char * port){
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 0;   /* inter-character timer unused */
+    newtio.c_cc[VTIME] = 1;   /* inter-character timer unused */
     newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
 
 /*
@@ -297,7 +291,7 @@ int llopen_receiver(char * port){
     return fd;
 }
 
-int writeFrameI(int fd, unsigned char *buffer, int length){
+/*int writeFrameI(int fd, unsigned char *buffer, int length){
     int max_length = 2 * length + 6;
     unsigned char frame[max_length];
 
@@ -343,20 +337,53 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     }
 
     printf("Frame: %s\n Frame size; %d\n", frame, i+4);
-    return frame;
+    return i+4;
 }
 
 int llwrite(int fd, unsigned char *buffer, int length){
     printf("llwrite starting\n");
-    
+    int counter;
+
     do
     {
-        writeFrameI(fd, buffer, length);
+        counter = writeFrameI(fd, buffer, length);
         startAlarm();
         
-        int result = verifyRRREJ(buffer);
-        if()
+        char answer[5];
+        if(read(fd, answer, 5) == -1){
+            perror("Error reading receptor answer");
+            continue;
+        }
+
+        int result = verifyFrame(answer, DATA_CTRL);
+        if(result != 3){
+            continue;
+        }
+        else{
+          alarmFlag=FALSE;
+          sendTries=0;
+          alarm(0);
+          printf("RR received: %s\n", answer);
+        }
         
     } while (sendTries < MAX_TRIES && alarmFlag);
+
     
+    if(sendTries == MAX_TRIES){
+      sendTries = 0;
+      alarmFlag = FALSE; 
+
+      perror("Timed out too many times");
+      exit(-1);
+    }
+
+    return counter;
 }
+
+int readFrameI(int fd, char *buffer){
+
+}
+
+int llread(int fd, char *buffer){
+
+}*/
