@@ -214,6 +214,68 @@ int stateMachine(int numChars, char *value){
 }
 */
 
+int byteStuffing(unsigned char* buf, int len, unsigned char* result){
+    unsigned char bcc2 = 0x00;
+
+    for(int j = 0; j < len; j++){
+        bcc2 ^= buf[j];
+    }
+    int size = 4;
+    for(size_t i=0; i < len; i++){
+        if(buf[i] == FLAG || buf[i] == ESC){
+            result[size] = ESC;
+            result[size+1] = buf[i] ^ STUFF;
+            size++;
+        }
+        else{
+            result[size] = buf[i];
+        }
+        size++;
+    }
+
+    if(bcc2 == FLAG || bcc2 == ESC){
+        result[size] = ESC;
+        result[size+1] = bcc2 ^ STUFF;
+        size+=2;
+    }
+    else{
+        result[size] = bcc2;
+        size++;
+    }
+
+    result[size] = FLAG;
+    return size;
+}
+
+int byteDestuffing(char* buf, int len, char* result){
+    result[0] = buf[0];
+    result[1] = buf[1];
+    result[2] = buf[2];
+    result[3] = buf[3];
+    int j = 4;
+    int i;
+    for (i = 4; i < len - 1; i++) {
+        if (buf[i] == ESC) {
+            i++;
+            if (buf[i] == (FLAG ^ STUFF)){
+                result[j] = FLAG;
+                j++;
+            }
+            else if (buf[i] == (ESC ^ STUFF)){
+                result[j] = ESC;
+                j++;
+            }
+        }
+        else {
+            result[j] = buf[i];
+            j++;
+        }
+    }
+
+    result[j] = buf[i+1];
+    return j+1;
+}
+
 int openPort(char *port, struct termios *oldtio){
     struct termios newtio;
 
@@ -296,7 +358,7 @@ int llopen_receiver(char * port){
     return fd;
 }
 
-/*int writeFrameI(int fd, unsigned char *buffer, int length){
+int writeFrameI(int fd, unsigned char *buffer, int length){
     int max_length = 2 * length + 6;
     unsigned char frame[max_length];
 
@@ -308,41 +370,12 @@ int llopen_receiver(char * port){
 
     frame[3] = (frame[1] ^ frame[2]);
     
-    unsigned char bcc2 = 0x00;
-
-    for(int j = 0; j < length; j++){
-        bcc2 ^= buffer[j];
-    }
-    
-    int i = 0;
-    for(i; i < length; i++){
-        if(buffer[i] == FLAG || buffer[i] == ESC){
-            frame[i+4] = ESC;
-            frame[i+5] = buffer[i] ^ STUFF;
-        }
-        else{
-            frame[i+4] = buffer[i];
-        }
-    }
-
-    if(bcc2 == FLAG || bcc2 == ESC){
-        frame[i + 4] = ESC;
-        frame[i + 5] = bcc2 ^ STUFF;
-        i+=2;
-    }
-    else{
-        frame[i+4] = bcc2;
-        i++;
-    }
-
-    frame[i+4] = FLAG;
-    if(write(fd, frame, i+4) == -1){
+    int size = byteStuffing(buffer, length, frame);
+    if(write(fd, frame, size) == -1){
         perror("Error writing to fd");
         exit(-1);
     }
 
-    printf("Frame: %s\n Frame size; %d\n", frame, i+4);
-    return i+4;
 }
 
 int llwrite(int fd, unsigned char *buffer, int length){
@@ -385,13 +418,65 @@ int llwrite(int fd, unsigned char *buffer, int length){
     return counter;
 }
 
-int readFrameI(int fd, char *buffer){
+int stateMachine(enumStates* state, unsigned char byte){
+    switch (*state)
+    {
+        case START:
+            if (byte == FLAG) *state = FLAG_R;
+            break;
 
+            case FLAG_R:
+            if (byte == A_ADRESS) *state = A_R;
+            else if(byte == FLAG){
+                break;
+            }
+            else {
+                *state = START;
+            }
+            break;
+        case A_R:
+            if (byte == 0x00|| byte == 0x40) *state = C_R;
+            else if(byte == FLAG) *state = FLAG_R;
+            else *state = START;
+            break;
+        case C_R:
+            if (byte == (A_ADRESS ^ 0x00) || byte == (A_ADRESS ^ 0x40)){
+            *state = BCC1_R;
+            }
+            else if(byte == FLAG) *state = FLAG_R;
+            else *state = START;
+            break;
+        case BCC1_R:
+            if (byte != FLAG) *state = DATA_R;
+            break;
+        case DATA_R:
+            if (byte == FLAG) *state = END; //sucess
+            break;
+
+        case END:
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+int readFrameI(int fd, char *buffer){
+    int len = 0;
+    unsigned char currentByte;
+    enumStates state = START;
+    while(read(fd,&currentByte,1)>0){
+        stateMachine(&state, currentByte);
+        buffer[len] = currentByte;
+        len++;
+        if(state==END)break;
+    }
+    return len;
 }
 
 int llread(int fd, char *buffer){
 
-}*/
+}
 
 int llclose_transmitter(int fd){
     

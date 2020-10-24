@@ -39,13 +39,15 @@ typedef struct{
 
 int setLinkLayerStruct();
 
+typedef enum {START, FLAG_R, A_R, C_R, BCC1_R, DATA_R, END, ERROR} enumStates;
+
 int sendMessageTransmitter(int fd, int type);
 
 int sendMessageReceiver(int fd, int type);
 
 int verifyFrame(char *message, int type);
 
-int stateMachine(int numChars, char *value);
+int stateMachine(enumStates* state, unsigned char value);
 
 int openPort(char *port, struct termios *oldtio);
 
