@@ -39,13 +39,17 @@ typedef struct{
 
 int setLinkLayerStruct();
 
-int sendMessageSET(int fd);
+int sendMessageTransmitter(int fd, int type);
 
-int sendMessageUA(int fd);
+int sendMessageReceiver(int fd, int type);
 
 int verifyFrame(char *message, int type);
 
 int stateMachine(int numChars, char *value);
+
+int openPort(char *port, struct termios *oldtio);
+
+void closePort(int fd, struct termios *oldtio);
 
 int llopen_transmitter(char * port);
 
@@ -54,3 +58,5 @@ int llopen_receiver(char * port);
 int llwrite(int fd, unsigned char *buffer, int length);
 
 int writeFrameI(int fd, unsigned char *buffer, int length);
+
+int llclose_transmitter(int fd);

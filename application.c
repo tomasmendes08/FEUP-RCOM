@@ -35,6 +35,5 @@ int main(int argc, char** argv)
       o indicado no gui�o
     */
 
-    close(fd);
     return 0;
 }

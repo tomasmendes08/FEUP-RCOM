@@ -3,6 +3,7 @@
 int stop = FALSE;
 //LinkLayer linkLayer;
 int success = 2;
+struct termios oldtio;
 
 
 /*int setLinkLayerStruct(){
@@ -11,29 +12,44 @@ int success = 2;
 }*/
 
 
-int sendMessageSET(int fd){
+int sendMessageTransmitter(int fd, int type){
     char message[5];
-    char ua_message[5];
+    char receiver_message[5];
     alarmSetup();
     do{
 
       message[0] = FLAG;
       message[1] = A_ADRESS;
-      message[2] = SET_CTRL;
-      message[3] = (A_ADRESS ^ SET_CTRL);
+      
+      if(type == SET){
+        message[2] = SET_CTRL;
+        message[3] = (A_ADRESS ^ SET_CTRL);
+      }
+      else if(type == DISC){
+        message[2] = DISC_CTRL;
+        message[3] = (A_ADRESS ^ DISC_CTRL);
+      }
+
       message[4] = FLAG;
-    
-      printf("SET: %s\n", message);
+      
+      if(type == SET) printf("SET: %s\n", message);
+      else if(type == DISC) printf("DISC: %s\n", message);
+
       if(write(fd, message, 5)==-1){
           perror("Error writing SET message");
           continue;
       }
+
       alarm(ALARM_TIME);
-      if(read(fd, ua_message, 5)==-1){
+      if(read(fd, receiver_message, 5)==-1){
           perror("Error reading UA from fd");
           continue;
       }
-      if(verifyFrame(ua_message, UA)){
+
+      if(verifyFrame(receiver_message, UA)){
+          continue;
+      }
+      else if(verifyFrame(receiver_message, DISC)){
           continue;
       }
       else{
@@ -43,10 +59,10 @@ int sendMessageSET(int fd){
       }
 
     } while(sendTries < MAX_TRIES && alarmFlag);
+    
     if(sendTries == MAX_TRIES){
       sendTries = 0;
-        alarmFlag = FALSE;
-
+      alarmFlag = FALSE;
       perror("Timed out too many times");
       return 1;
     }
@@ -54,13 +70,21 @@ int sendMessageSET(int fd){
     return 0;
 }
 
-int sendMessageUA(int fd){
+int sendMessageReceiver(int fd, int type){
     char message[5];
 
     message[0] = FLAG;
     message[1] = A_ADRESS;
-    message[2] = UA_CTRL;
-    message[3] = (A_ADRESS ^ UA_CTRL);
+
+    if(type == UA){
+        message[2] = UA_CTRL;
+        message[3] = (A_ADRESS ^ UA_CTRL);
+    }
+    else if(type == DISC){
+        message[2] = DISC_CTRL;
+        message[3] = (A_ADRESS ^ DISC_CTRL);
+    }
+    
     message[4] = FLAG;
 
     int result = write(fd, message, 5);
@@ -69,7 +93,9 @@ int sendMessageUA(int fd){
         exit(-1);
     }
 
-    printf("UA: %s\n", message);
+    if(type==UA) printf("UA: %s\n", message);
+    else if(type == DISC) printf("DISC: %s\n", message);
+
     return result;
 }
 
@@ -187,9 +213,9 @@ int stateMachine(int numChars, char *value){
     return state;
 }
 */
-int llopen_transmitter(char * port){
 
-    struct termios oldtio, newtio;
+int openPort(char *port, struct termios *oldtio){
+    struct termios newtio;
 
     int fd = open(port, O_RDWR | O_NOCTTY);
     if(fd == -1){
@@ -197,7 +223,7 @@ int llopen_transmitter(char * port){
         exit(-1);
     }
 
-    if ( tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
+    if ( tcgetattr(fd,oldtio) == -1) { /* save current port settings */
         perror("tcgetattr");
         exit(-1);
     }
@@ -227,50 +253,31 @@ int llopen_transmitter(char * port){
 
     printf("New termios structure set\n");
 
-    if(sendMessageSET(fd)) exit(-1);
+    return fd;
+}
+
+void closePort(int fd, struct termios *oldtio){
+    tcflush(fd, TCIOFLUSH);
+
+    if(tcsetattr(fd, TCSANOW, oldtio)==-1){
+        perror("tcsetattr");
+        exit(-1);
+    }
+    close(fd);
+}
+
+int llopen_transmitter(char * port){
+
+    int fd = openPort(port, &oldtio);
+
+    if(sendMessageTransmitter(fd, SET)) exit(-1);
 
     return fd;
 }
 
 int llopen_receiver(char * port){
 
-    struct termios oldtio, newtio;
-
-    int fd = open(port, O_RDWR | O_NOCTTY);
-    if(fd == -1){
-        perror("Port error");
-        exit(-1);
-    }
-
-    if ( tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
-        perror("tcgetattr");
-        exit(-1);
-    }
-
-    bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
-
-    /* set input mode (non-canonical, no echo,...) */
-    newtio.c_lflag = 0;
-
-    newtio.c_cc[VTIME] = 1;   /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
-
-/*
-  VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-  leitura do(s) pr�ximo(s) caracter(es)
-*/
-
-    tcflush(fd, TCIOFLUSH);
-
-    if (tcsetattr(fd,TCSANOW,&newtio) == -1) {
-        perror("tcsetattr");
-        exit(-1);
-    }
-
-    printf("New termios structure set\n");
+    int fd = openPort(port, &oldtio);
 
     char set_message[5];
     while(1) {
@@ -282,8 +289,10 @@ int llopen_receiver(char * port){
         if(verifyFrame(set_message, SET)==0)
             break;
     }
-        int result = sendMessageUA(fd);
-        printf("UA result: %d\n", result);
+
+    int result = sendMessageReceiver(fd, UA);
+    printf("UA result: %d\n", result);
+
     return fd;
 }
 
@@ -383,3 +392,44 @@ int readFrameI(int fd, char *buffer){
 int llread(int fd, char *buffer){
 
 }*/
+
+int llclose_transmitter(int fd){
+    
+    sendMessageTransmitter(fd, DISC);
+    
+    sendMessageReceiver(fd, UA);
+
+    closePort(fd, &oldtio);
+
+    return 2;
+}
+
+int llclose_receiver(int fd){
+
+    char disc_message[5];
+    while(1) {
+        if (read(fd, disc_message, 5) == -1) {
+            perror("Error reading SET from fd");
+            exit(-1);
+        }
+
+        if(verifyFrame(disc_message, DISC)==0)
+            break;
+    }
+
+    sendMessageReceiver(fd, DISC);
+
+    char ua_message[5];
+    while(1) {
+        if (read(fd, ua_message, 5) == -1) {
+            perror("Error reading SET from fd");
+            exit(-1);
+        }
+
+        if(verifyFrame(ua_message, UA)==0)
+            break;
+    }
+
+    closePort(fd, &oldtio);
+    return 2;
+}
