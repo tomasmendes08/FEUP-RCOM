@@ -4,14 +4,17 @@ int stop = FALSE;
 //LinkLayer linkLayer;
 int success = 2;
 
+
 /*int setLinkLayerStruct(){
     linkLayer.sequenceNumber = 0;
     linkLayer.baudRate = BAUDRATE;
 }*/
 
+
 int sendMessageSET(int fd){
     char message[5];
-
+    char ua_message[5];
+    alarmSetup();
     do{
 
       message[0] = FLAG;
@@ -21,20 +24,15 @@ int sendMessageSET(int fd){
       message[4] = FLAG;
     
       printf("SET: %s\n", message);
-
-      int result = write(fd, message, 5);
-      if(result == -1){
+      if(write(fd, message, 5)==-1){
           perror("Error writing SET message");
           continue;
       }
-      startAlarm();
-
-      char ua_message[5];
+      alarm(ALARM_TIME);
       if(read(fd, ua_message, 5)==-1){
           perror("Error reading UA from fd");
           continue;
       }
-
       if(verifyFrame(ua_message, UA)){
           continue;
       }
@@ -45,10 +43,9 @@ int sendMessageSET(int fd){
       }
 
     } while(sendTries < MAX_TRIES && alarmFlag);
-
     if(sendTries == MAX_TRIES){
       sendTries = 0;
-      alarmFlag = FALSE; 
+        alarmFlag = FALSE;
 
       perror("Timed out too many times");
       return 1;
@@ -125,7 +122,6 @@ int verifyFrame(char *message, int type){
       } 
       
       return success;
-      break;
     default:
       break;
   }
@@ -277,17 +273,17 @@ int llopen_receiver(char * port){
     printf("New termios structure set\n");
 
     char set_message[5];
+    while(1) {
+        if (read(fd, set_message, 5) == -1) {
+            perror("Error reading SET from fd");
+            exit(-1);
+        }
 
-    if(read(fd, set_message, 5)==-1){
-        perror("Error reading SET from fd");
-        exit(-1);
+        if(verifyFrame(set_message, SET)==0)
+            break;
     }
-
-    int set_received = verifyFrame(set_message, SET);
-
-    int result = sendMessageUA(fd);
-    printf("UA result: %d\n", result);
-
+        int result = sendMessageUA(fd);
+        printf("UA result: %d\n", result);
     return fd;
 }
 
@@ -343,11 +339,11 @@ int llopen_receiver(char * port){
 int llwrite(int fd, unsigned char *buffer, int length){
     printf("llwrite starting\n");
     int counter;
-
+    alarmSetup();
     do
     {
         counter = writeFrameI(fd, buffer, length);
-        startAlarm();
+        alarm(ALARM_TIME);
         
         char answer[5];
         if(read(fd, answer, 5) == -1){
