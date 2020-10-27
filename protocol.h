@@ -26,6 +26,10 @@
 #define DISC            2
 #define DATA_CTRL       3
 #define FI_CTRL0        0x00
+#define RR0             0x05
+#define RR1             0x85
+#define REJ0            0x01
+#define REJ1            0x81
 #define FI_CTRL1        0x40
 #define ESC             0x7D
 #define STUFF           0x20
