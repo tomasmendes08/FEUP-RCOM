@@ -51,7 +51,7 @@ int stateMachine(enumStates* state, unsigned char value);
 
 int openPort(char *port, struct termios *oldtio);
 
-void closePort(int fd, struct termios *oldtio);
+int closePort(int fd, struct termios *oldtio);
 
 int llopen_transmitter(char * port);
 

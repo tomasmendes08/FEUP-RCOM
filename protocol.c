@@ -318,7 +318,7 @@ int openPort(char *port, struct termios *oldtio){
     return fd;
 }
 
-void closePort(int fd, struct termios *oldtio){
+int closePort(int fd, struct termios *oldtio){
     tcflush(fd, TCIOFLUSH);
 
     if(tcsetattr(fd, TCSANOW, oldtio)==-1){
@@ -326,6 +326,7 @@ void closePort(int fd, struct termios *oldtio){
         exit(-1);
     }
     close(fd);
+    return 0;
 }
 
 int llopen_transmitter(char * port){
@@ -375,6 +376,8 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
         perror("Error writing to fd");
         exit(-1);
     }
+
+    return size;
 
 }
 
@@ -486,7 +489,7 @@ int llclose_transmitter(int fd){
 
     closePort(fd, &oldtio);
 
-    return 2;
+    return fd;
 }
 
 int llclose_receiver(int fd){
@@ -516,5 +519,5 @@ int llclose_receiver(int fd){
     }
 
     closePort(fd, &oldtio);
-    return 2;
+    return fd;
 }
