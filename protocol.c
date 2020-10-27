@@ -1,15 +1,14 @@
 #include "alarm.c"
 
-int stop = FALSE;
-//LinkLayer linkLayer;
+LinkLayer linkLayer;
 int success = 2;
 struct termios oldtio;
 
 
-/*int setLinkLayerStruct(){
+int setLinkLayerStruct(){
     linkLayer.sequenceNumber = 0;
     linkLayer.baudRate = BAUDRATE;
-}*/
+}
 
 
 int sendMessageTransmitter(int fd, int type){
@@ -130,13 +129,13 @@ int verifyFrame(char *message, int type){
       printf("DISC received: %s\n", message);
       break;
     case DATA_CTRL:     //RR or REJ
-      if(message[2] != 0x85 && message[2] != 0x05){
+      if(message[2] != RR1 && message[2] != RR0){
         perror("Error in verifyFrame (RR -> Control)");
         return 1;
       }
       else success = 3;
 
-      if(message[2] != 0x81 && message[2] != 0x01){
+      if(message[2] != REJ1 && message[2] != REJ0){
         perror("Error in verifyFrame (REJ -> Control)");
         return 1;
       }
@@ -154,65 +153,6 @@ int verifyFrame(char *message, int type){
 
   return 0;
 }
-/*
-int stateMachine(int numChars, char *value){
-    size_t state = 0;
-    while(state < numChars){
-        switch (state)
-        {
-            case 0:
-                if(value[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-
-            case 1:
-                if(value[state] == A_ADRESS)
-                    state = 2;
-                else if(value[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-
-            case 2:
-                if(value[state] == UA_CTRL || value[state] == SET_CTRL)
-                    state = 3;
-                else if (value[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-
-            case 3:
-                if(value[state] == (A_ADRESS ^ UA_CTRL))
-                    state = 4;
-                else if (value[state] == FLAG)
-                    state = 1;
-                else
-                    state = 0;
-                break;
-
-            case 4:
-                if(value[state] == FLAG){
-                    stop = TRUE;
-                    //alarm(0);
-                    printf("UA/SET received.\n");
-                    state = 5;
-                }
-                else
-                    state = 0;
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    return state;
-}
-*/
 
 int byteStuffing(unsigned char* buf, int len, unsigned char* result){
     unsigned char bcc2 = 0x00;
@@ -450,7 +390,7 @@ int stateMachine(enumStates* state, unsigned char byte){
             if (byte != FLAG) *state = DATA_R;
             break;
         case DATA_R:
-            if (byte == FLAG) *state = END; //sucess
+            if (byte == FLAG) *state = END;
             break;
 
         case END:
@@ -469,13 +409,56 @@ int readFrameI(int fd, char *buffer){
         stateMachine(&state, currentByte);
         buffer[len] = currentByte;
         len++;
-        if(state==END)break;
+        if(state==END) return len;
     }
-    return len;
+    return 0;
 }
 
-int llread(int fd, char *buffer){
 
+
+int llread(int fd, char *buffer){
+    char* frame;
+    int framelen = readFrameI(fd, frame);
+    char response[5];
+    response[0] = FLAG;
+    response[1] = A_ADRESS;
+    response[4] = FLAG;
+    if(framelen>0){
+        byteDestuffing(frame, framelen, buffer);
+        if(buffer[2]==RR0){
+            response[2] = (char)RR0;
+            response[3] = (char)(A_ADRESS ^ RR0);
+            if(linkLayer.sequenceNumber==0) linkLayer.sequenceNumber=1;
+
+        }
+        else if(buffer[2]==(char)RR1){
+            response[2] = (char)RR1;
+            response[3] = (char)(A_ADRESS ^ RR1);
+            if(linkLayer.sequenceNumber==1) linkLayer.sequenceNumber=0;
+        }
+        else{
+            if(linkLayer.sequenceNumber==0){
+                response[2] = (char)REJ0;
+                response[3] = (char)(A_ADRESS ^ REJ0);
+            }
+            else if(linkLayer.sequenceNumber==1){
+                response[2] = (char)REJ1;
+                response[3] = (char)(A_ADRESS ^ REJ1);
+            }
+        }
+    }
+    else{
+        if(linkLayer.sequenceNumber==0){
+            response[2] = (char)REJ0;
+            response[3] = (char)(A_ADRESS ^ REJ0);
+        }
+        else if(linkLayer.sequenceNumber==1){
+            response[2] = (char)REJ1;
+            response[3] = (char)(A_ADRESS ^ REJ1);
+        }
+    }
+    write(fd,response,5);
+    return 0;
 }
 
 int llclose_transmitter(int fd){
