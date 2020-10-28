@@ -49,7 +49,7 @@ int sendMessageTransmitter(int fd, int type);
 
 int sendMessageReceiver(int fd, int type);
 
-int verifyFrame(char *message, int type);
+int verifyFrame(unsigned char *message, int type);
 
 int stateMachine(enumStates* state, unsigned char value);
 
@@ -66,3 +66,6 @@ int llwrite(int fd, unsigned char *buffer, int length);
 int writeFrameI(int fd, unsigned char *buffer, int length);
 
 int llclose_transmitter(int fd);
+
+int checkBCCs(unsigned char *buffer, int length, unsigned char *frame, int size);
+

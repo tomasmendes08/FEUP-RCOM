@@ -38,7 +38,7 @@ int createControlPacket(char *filename, int type){
         controlPacket[i+9] = applicationLayer.fileName[i];
     }
 
-    int length = 9*sizeof(unsigned char) + applicationLayer.fileName;
+    int length = 9*sizeof(unsigned char) + strlen(applicationLayer.fileName);
 
     llwrite(fd, controlPacket, length);
 
@@ -52,46 +52,46 @@ int readControlPacket(int fd){
 
     char *packet = string + 4;
     
-    if(packet[0]==0x02 || packet[0]==0x03) continue;
-    else {
+    if(!(packet[0]==(char)0x02 || packet[0]==(char)0x03)){
         perror("Initial packet flag");
         exit(-1);
     }
-    
-    if(packet[i] == (char)0x00){
-        i++;
-        size = (int) packet[i];
-        i++;
-
-        int j = 0;
-        char *octetos = malloc(size*sizeof(char));
-        for(i; i < 3 + size; i++){
-            octetos[j++] += packet[i];
-        } 
-    }
     else{
-        perror("Reading T1");
-        exit(-1);
-    }
+        if(packet[i] == (char)0x00){
+            i++;
+            size = (int) packet[i];
+            i++;
 
-    if(packet[i] == (char)0x01){
-        i++;
-        name_size = (int) packet[i];
-        i++;
+            int j = 0;
+            char *octetos = malloc(size*sizeof(char));
+            for(i; i < 3 + size; i++){
+                octetos[j++] += packet[i];
+            } 
+        }
+        else{
+            perror("Reading T1");
+            exit(-1);
+        }
 
-        int j = 0;
-        for(i; i < size+name_size+5; i++){
-            filename[j++] = packet[i];
+        if(packet[i] == (char)0x01){
+            i++;
+            name_size = (int) packet[i];
+            i++;
+
+            int j = 0;
+            for(i; i < size+name_size+5; i++){
+                filename[j++] = packet[i];
+            }
         }
     }
-
+    
     return 0;
 }
 
 int main(int argc, char** argv)
 {
     int fd, c, res;
-    char buf[255];
+    char buf[5]="12345", buf_read[5];
     int i, sum = 0, speed = 0;
     
     if ( (argc < 3) || 
@@ -102,11 +102,17 @@ int main(int argc, char** argv)
     }
 
     int arg = atoi(argv[2]);
-    if(arg == TRANSMITTER)
+    if(arg == TRANSMITTER){
         fd = llopen(argv[1], TRANSMITTER);
-    else if(arg == RECEIVER)
+        llwrite(fd, buf, 5);
+        llclose_transmitter(fd);
+    }
+    else if(arg == RECEIVER){
         fd = llopen(argv[1], RECEIVER);
-
+        llread(fd, buf_read);
+        printf("BUF_READ: %s\n", buf_read);
+        llclose_receiver(fd);
+    }
     /*
       O ciclo FOR e as instru��es seguintes devem ser alterados de modo a respeitar
       o indicado no gui�o

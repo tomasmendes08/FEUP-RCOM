@@ -12,4 +12,6 @@ typedef struct{
 
 int llopen(char *port, int status);
 
-int createControlPacket(unsigned char controlPacket);
+int createControlPacket(char *filename, int type);
+
+int readControlPacket(int fd);
