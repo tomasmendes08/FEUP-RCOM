@@ -336,7 +336,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
     do
     {
         counter = writeFrameI(fd, buffer, length);
-        alarm(ALARM_TIME);
+        alarm(ALARM_TIME);  
         
         unsigned char answer[5];
         if(read(fd, answer, 5) == -1){
@@ -497,7 +497,7 @@ int llread(int fd, unsigned char *buffer){
     
     
     write(fd,response,5);
-    return 0;
+    return framelen;
 }
 
 int llclose_transmitter(int fd){
@@ -506,6 +506,7 @@ int llclose_transmitter(int fd){
     
     sendMessageReceiver(fd, UA);
 
+    sleep(1);
     closePort(fd, &oldtio);
 
     return fd;
