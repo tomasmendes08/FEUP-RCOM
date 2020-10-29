@@ -18,12 +18,13 @@ void readFileData(char *filename){
     struct stat stat_buff;
     fstat(fd, &stat_buff);
 
+    printf("fd: %d\n", fd);
     applicationLayer.fileDes = fd;
     applicationLayer.fileSize = stat_buff.st_size;
     applicationLayer.fileName = filename;
 }
 
-int createControlPacket(char *filename, int type){
+int createControlPacket(int fd, int type){
     unsigned char controlPacket[1024]="";
     
     if(type == START) controlPacket[0] = 0x02;
@@ -43,7 +44,9 @@ int createControlPacket(char *filename, int type){
 
     int length = 9*sizeof(unsigned char) + strlen(applicationLayer.fileName);
 
-    llwrite(applicationLayer.fileDes, controlPacket, length);
+    printf("sup\n");
+    llwrite(fd, controlPacket, length);
+    printf("sup2\n");
 
     return length;
 }
@@ -89,7 +92,7 @@ int readControlPacket(int fd){
         }
     }
 
-    applicationLayer.fileDesNewFile = open(filename, O_CREAT | O_WRONLY | O_APPEND, 0664);
+    applicationLayer.fileDesNewFile = open("teste/godmarega.jpg", O_CREAT | O_WRONLY | O_APPEND, 0664);
     
     return 0;
 }
@@ -100,6 +103,7 @@ int createDataPacket(){
     int read_bytes = 0, packets_sent = 0;
 
     if(applicationLayer.fileSize % 1024 != 0) packets_to_send++;
+    printf("packets_to_send: %d\n", packets_to_send);
 
     while(packets_sent < packets_to_send){
         if((read_bytes = read(applicationLayer.fileDes, buffer, 1024)) == -1){
@@ -119,8 +123,9 @@ int createDataPacket(){
             j++;
         }
 
+        printf("123\n");
         llwrite(applicationLayer.porta_serie, packet, read_bytes+4);
-        packets_sent++;
+        printf("packets_sent: %d\n", packets_sent);
     }
 
     return 0;
@@ -135,10 +140,10 @@ int writeDataPackets(unsigned char *packet){
     return 0;
 }
 
-int sendFile(int fd, char *filename){
+int sendFile(int fd){
     applicationLayer.porta_serie = fd;
 
-    if(createControlPacket(filename, START) < 0){
+    if(createControlPacket(applicationLayer.porta_serie, START) < 0){
         perror("Error createControlPacket (START)");
         exit(-1);
     }
@@ -148,7 +153,7 @@ int sendFile(int fd, char *filename){
         exit(-1);
     }
 
-    if(createControlPacket(filename, END) < 0){
+    if(createControlPacket(applicationLayer.porta_serie, END) < 0){
         perror("Error createControlPacket (END)");
         exit(-1);
     }
@@ -157,8 +162,8 @@ int sendFile(int fd, char *filename){
 }
 
 int readFile(int fd){
-    unsigned char buffer[1028];
     applicationLayer.porta_serie = fd;
+    unsigned char buffer[1028];
 
     readControlPacket(applicationLayer.porta_serie);
 
@@ -182,12 +187,12 @@ int main(int argc, char** argv){
     int fd, c, res;
     int i, sum = 0, speed = 0;
     
-    if ( (argc < 3) || 
+    /*if ( (argc < 3) || 
   	     ((strcmp("/dev/ttyS10", argv[1])!=0) && 
   	      (strcmp("/dev/ttyS11", argv[1])!=0) )) {
         printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename(TRANSMITTER)\n\tex: nserial /dev/ttyS1 1 godmarega\n");      
         exit(-1);
-    }
+    }*/
 
     int arg = atoi(argv[2]);
     //int data_packet_size = atoi(argv[3]); //passar para a struct
@@ -195,7 +200,7 @@ int main(int argc, char** argv){
     if(arg == TRANSMITTER){
         readFileData(argv[3]);
         fd = llopen(argv[1], TRANSMITTER);
-        sendFile(fd, argv[3]);
+        sendFile(fd);
         llclose_transmitter(fd);
     }
     else if(arg == RECEIVER){

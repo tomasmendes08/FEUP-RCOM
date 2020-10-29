@@ -12,6 +12,7 @@ int setLinkLayerStruct(){
 
 
 int sendMessageTransmitter(int fd, int type){
+    char byte;
     char message[5];
     char receiver_message[5];
     alarmSetup();
@@ -40,10 +41,19 @@ int sendMessageTransmitter(int fd, int type){
       }
 
       alarm(ALARM_TIME);
-      if(read(fd, receiver_message, 5)==-1){
+      
+      for(int i = 0; i < 5; i++){
+            if (read(fd, &byte, 1) == -1) {
+                perror("Error reading UA/DISC from fd");
+                exit(-1);
+            }
+            receiver_message[i] = byte;
+      }
+
+      /*if(read(fd, receiver_message, 5)==-1){
           perror("Error reading UA from fd");
           continue;
-      }
+      }*/
 
     if(verifyFrame(receiver_message, DISC)){
        if(verifyFrame(receiver_message, UA))
@@ -78,6 +88,7 @@ int sendMessageReceiver(int fd, int type){
     message[0] = FLAG;
     message[1] = A_ADRESS;
 
+
     if(type == UA){
         message[2] = UA_CTRL;
         message[3] = (A_ADRESS ^ UA_CTRL);
@@ -102,7 +113,7 @@ int sendMessageReceiver(int fd, int type){
 }
 
 int verifyFrame(unsigned char *message, int type){
-  
+  printf("message[0]: %d\nmessage[1]: %d\n", (int) message[0], (int) message[1]);
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
     return 1;
@@ -241,8 +252,8 @@ int openPort(char *port, struct termios *oldtio){
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
-    newtio.c_cc[VTIME] = 1;   /* inter-character timer unused */
-    newtio.c_cc[VMIN] = 5;   /* blocking read until 5 chars received */
+    newtio.c_cc[VTIME] = 10;   /* inter-character timer unused */
+    newtio.c_cc[VMIN] = 1;   /* blocking read until 5 chars received */
 
 /*
   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
@@ -282,15 +293,23 @@ int llopen_transmitter(char * port){
 }
 
 int llopen_receiver(char * port){
-
     int fd = openPort(port, &oldtio);
 
-    char set_message[5];
+    char set_message[5], byte;
     while(1) {
-        if (read(fd, set_message, 5) == -1) {
+        for(int i = 0; i < 5; i++){
+            if (read(fd, &byte, 1) == -1) {
+                perror("Error reading SET from fd");
+                exit(-1);
+            }
+            set_message[i] = byte;
+        }
+
+       /* if (read(fd, set_message, 5) == -1) {
             perror("Error reading SET from fd");
             exit(-1);
-        }
+        }*/
+        printf("set_message: %s\n", set_message);
 
         if(verifyFrame(set_message, SET)==0)
             break;
@@ -332,6 +351,7 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
 int llwrite(int fd, unsigned char *buffer, int length){
     printf("llwrite starting\n");
     int counter;
+    unsigned char byte;
     alarmSetup();
     do
     {
@@ -339,9 +359,13 @@ int llwrite(int fd, unsigned char *buffer, int length){
         alarm(ALARM_TIME);  
         
         unsigned char answer[5];
-        if(read(fd, answer, 5) == -1){
-            perror("Error reading receptor answer");
-            continue;
+        
+        for(int i = 0; i < 5; i++){
+            if (read(fd, &byte, 1) == -1) {
+                perror("Error reading RR/REJ from fd");
+                exit(-1);
+            }
+            answer[i] = byte;
         }
 
         int result = verifyFrame(answer, DATA_CTRL);
@@ -513,13 +537,22 @@ int llclose_transmitter(int fd){
 }
 
 int llclose_receiver(int fd){
-
-    char disc_message[5];
+    int aux;
+    char disc_message[5], byte;
     while(1) {
-        if (read(fd, disc_message, 5) == -1) {
+        
+        for(int i = 0; i < 5; i++){
+            if (read(fd, &byte, 1) == -1) {
+                perror("Error reading DISC from fd");
+                exit(-1);
+            }
+            disc_message[i] = byte;
+        }
+
+        /*if (read(fd, disc_message, 5) == -1) {
             perror("Error reading SET from fd");
             exit(-1);
-        }
+        }*/
 
         if(verifyFrame(disc_message, DISC)==0)
             break;
@@ -527,13 +560,23 @@ int llclose_receiver(int fd){
 
     sendMessageReceiver(fd, DISC);
 
-    char ua_message[5];
+    int aux2;
+    char ua_message[5], byte2;
     while(1) {
-        if (read(fd, ua_message, 5) == -1) {
-            perror("Error reading SET from fd");
-            exit(-1);
+        
+        for(int i = 0; i < 5; i++){
+            if (read(fd, &byte2, 1) == -1) {
+                perror("Error reading UA from fd");
+                exit(-1);
+            }
+            ua_message[i] = byte2;
+            printf("ua_message: %d\n", (int)ua_message[i]);
         }
 
+        /*if (read(fd, ua_message, 5) == -1) {
+            perror("Error reading SET from fd");
+            exit(-1);
+        }*/
         if(verifyFrame(ua_message, UA)==0)
             break;
     }
