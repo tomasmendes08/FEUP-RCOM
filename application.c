@@ -25,7 +25,7 @@ void readFileData(char *filename){
 }
 
 int createControlPacket(int fd, int type){
-    unsigned char controlPacket[1024]="";
+    unsigned char controlPacket[256];
     
     if(type == START) controlPacket[0] = 0x02;
     else if(type == END) controlPacket[0] = 0x03;
@@ -44,15 +44,13 @@ int createControlPacket(int fd, int type){
 
     int length = 9*sizeof(unsigned char) + strlen(applicationLayer.fileName);
 
-    printf("sup\n");
     llwrite(fd, controlPacket, length);
-    printf("sup2\n");
 
     return length;
 }
 
 int readControlPacket(int fd){
-    unsigned char packet[1024];
+    unsigned char packet[256];
     int i = 1, file_size, filename_size;
     char *filename;
     llread(fd, packet);
@@ -92,38 +90,54 @@ int readControlPacket(int fd){
         }
     }
 
-    applicationLayer.fileDesNewFile = open("teste/godmarega.jpg", O_CREAT | O_WRONLY | O_APPEND, 0664);
+    applicationLayer.fileDesNewFile = open(applicationLayer.fileDestName, O_CREAT | O_WRONLY | O_APPEND, 0664);
     
     return 0;
 }
 
 int createDataPacket(){
-    char buffer[1024];
-    int packets_to_send = applicationLayer.fileSize/1024;
+    char buffer[applicationLayer.packetSize];
+    int packets_to_send = applicationLayer.fileSize/applicationLayer.packetSize;
     int read_bytes = 0, packets_sent = 0;
+    int lastbyte = applicationLayer.fileSize % applicationLayer.packetSize, flag = FALSE;
+    if(lastbyte != 0){
+        flag = TRUE;
+    }
+    //printf("packets_to_send: %d\n", flag?packets_to_send+1:packets_to_send);
+    //printf("Packets Sent: %d\n Packets to send: %d\n Lastbyte: %d\n Packet Size: %d\n", packets_sent, packets_to_send, lastbyte, applicationLayer.packetSize);
+    while(packets_sent <= packets_to_send){
+        int count = 0;
+        if((packets_sent == packets_to_send) && flag){
+            while(count < lastbyte){
+                if(read(applicationLayer.fileDes, buffer, 1) == -1){
+                    perror("Error reading");
+                    read_bytes++;
+                }
+                count++;
+            }
+        }
+        else{
 
-    if(applicationLayer.fileSize % 1024 != 0) packets_to_send++;
-    printf("packets_to_send: %d\n", packets_to_send);
-
-    while(packets_sent < packets_to_send){
-        if((read_bytes = read(applicationLayer.fileDes, buffer, 1024)) == -1){
-            perror("Error reading");
+            while(count < applicationLayer.packetSize){
+                if(read(applicationLayer.fileDes, buffer, 1) == -1){
+                    perror("Error reading");
+                    read_bytes++;
+                }
+                count++;
+            }
         }
 
-        unsigned char packet[1028];
+        unsigned char packet[((packets_sent == packets_to_send) && flag)?lastbyte+4:applicationLayer.packetSize+4];
         packet[0] = DATA;
         packet[1] = packets_sent;
         packets_sent++;
         packet[2] = read_bytes/256;
         packet[3] = read_bytes%256;
 
-        int j = 0;
-        for(int i = 4; i < 1028; i++){
-            packet[i] = buffer[j];
-            j++;
+        for(int i = 4; i < ((packets_sent == packets_to_send) && flag)?lastbyte+4:applicationLayer.packetSize+4; i++){
+            packet[i] = buffer[i-4];
         }
 
-        printf("123\n");
         llwrite(applicationLayer.porta_serie, packet, read_bytes+4);
         printf("packets_sent: %d\n", packets_sent);
     }
@@ -163,7 +177,7 @@ int sendFile(int fd){
 
 int readFile(int fd){
     applicationLayer.porta_serie = fd;
-    unsigned char buffer[1028];
+    unsigned char buffer[65537];
 
     readControlPacket(applicationLayer.porta_serie);
 
@@ -186,14 +200,17 @@ int readFile(int fd){
 int main(int argc, char** argv){
     int fd, c, res;
     int i, sum = 0, speed = 0;
-    
-    /*if ( (argc < 3) || 
-  	     ((strcmp("/dev/ttyS10", argv[1])!=0) && 
-  	      (strcmp("/dev/ttyS11", argv[1])!=0) )) {
-        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename(TRANSMITTER)\n\tex: nserial /dev/ttyS1 1 godmarega\n");      
-        exit(-1);
-    }*/
 
+    if ( (argc < 4) ||
+  	     ((strcmp("/dev/ttyS10", argv[1])!=0) && 
+  	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
+          (strcmp("/dev/ttyS1", argv[1])!=0) &&
+          (strcmp("/dev/ttyS0", argv[1])!=0) )) {
+        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (PacketSize) \n\tex: nserial /dev/ttyS1 1 filename.jpg 1024\n");
+        exit(-1);
+    }
+    if(argc > 4) applicationLayer.packetSize = atoi(argv[4]);
+    else applicationLayer.packetSize = 1024;
     int arg = atoi(argv[2]);
     //int data_packet_size = atoi(argv[3]); //passar para a struct
 
@@ -205,6 +222,7 @@ int main(int argc, char** argv){
     }
     else if(arg == RECEIVER){
         fd = llopen(argv[1], RECEIVER);
+        applicationLayer.fileDestName = argv[3];
         readFile(fd);
         llclose_receiver(fd);
     }

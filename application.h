@@ -6,7 +6,9 @@
 
 typedef struct{
 
-    char *fileName;            
+    char *fileName;
+    char *fileDestName;
+    int packetSize;
     int fileSize;
     int fileDes;
     int fileDesNewFile;
