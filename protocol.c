@@ -4,7 +4,6 @@ LinkLayer linkLayer;
 int success = FALSE;
 struct termios oldtio;
 
-
 int setLinkLayerStruct(){
     linkLayer.sequenceNumber = 0;
     linkLayer.baudRate = BAUDRATE;
@@ -15,9 +14,9 @@ int sendMessageTransmitter(int fd, int type){
     char byte;
     char message[5];
     char receiver_message[5];
-    alarmSetup();
     do{
-
+      alarmSetup();
+      int flag = FALSE;
       message[0] = FLAG;
       message[1] = A_ADRESS;
       
@@ -32,8 +31,8 @@ int sendMessageTransmitter(int fd, int type){
 
       message[4] = FLAG;
       
-      if(type == SET) printf("SET: %s\n", message);
-      else if(type == DISC) printf("DISC: %s\n", message);
+      if(type == SET) printf("SET sent\n");
+      else if(type == DISC) printf("DISC sent\n");
 
       if(write(fd, message, 5)==-1){
           perror("Error writing SET message");
@@ -45,32 +44,33 @@ int sendMessageTransmitter(int fd, int type){
       for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading UA/DISC from fd");
-                exit(-1);
+                flag = TRUE;
+                break;
+                //exit(-1);
             }
             receiver_message[i] = byte;
       }
-
+      if(!flag) {
+          if (verifyFrame(receiver_message, DISC)) {
+              if (verifyFrame(receiver_message, UA)) continue;
+              else {
+                  alarmFlag = FALSE;
+                  //sendTries=0;
+                  alarm(0);
+              }
+          } else {
+              alarmFlag = FALSE;
+              //sendTries=0;
+              alarm(0);
+          }
+      }
       /*if(read(fd, receiver_message, 5)==-1){
           perror("Error reading UA from fd");
           continue;
       }*/
 
-    if(verifyFrame(receiver_message, DISC)){
-       if(verifyFrame(receiver_message, UA))
-            continue;
-        else{
-            alarmFlag=FALSE;
-            sendTries=0;
-            alarm(0);
-        }
-      }
-      else{
-          alarmFlag=FALSE;
-          sendTries=0;
-          alarm(0);
-      }
 
-    } while(sendTries < MAX_TRIES && alarmFlag);
+    } while(sendTries <= MAX_TRIES && alarmFlag);
     
     if(sendTries == MAX_TRIES){
       sendTries = 0;
@@ -102,18 +102,18 @@ int sendMessageReceiver(int fd, int type){
 
     int result = write(fd, message, 5);
     if(result == -1){
-        perror("Writing UA message");
+        perror("Error writing UA message");
         exit(-1);
     }
 
-    if(type==UA) printf("UA: %s\n", message);
-    else if(type == DISC) printf("DISC: %s\n", message);
+    if(type==UA) printf("UA sent\n");
+    else if(type == DISC) printf("DISC sent\n");
 
     return result;
 }
 
 int verifyFrame(unsigned char *message, int type){
-  printf("message[0]: %d\nmessage[1]: %d\n", (int) message[0], (int) message[1]);
+  //printf("message[0]: %d\nmessage[1]: %d\n", (int) message[0], (int) message[1]);
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
     return 1;
@@ -126,23 +126,23 @@ int verifyFrame(unsigned char *message, int type){
         perror("Error in verifyFrame (SET)");
         return 1;
       }
-      printf("SET received: %s\n", message);
+      printf("SET received\n");
       break;
     case UA:
       if(!(message[2]==UA_CTRL && message[3]==(A_ADRESS ^ UA_CTRL))){
         perror("Error in verifyFrame (UA)");
         return 1;
       }
-      printf("UA received: %s\n", message);
+      printf("UA received\n");
       break;
     case DISC:
       if(!(message[2]==DISC_CTRL && message[3]==(A_ADRESS ^ DISC_CTRL))){
         return 1;
       }
-      printf("DISC received: %s\n", message);
+      printf("DISC received\n");
       break;
     case DATA_CTRL:     //RR or REJ
-      printf("ControlField: %d\n", (int) message[2]);
+      //printf("ControlField: %d\n", (int) message[2]);
       if(message[2] != RR1 && message[2] != RR0){
         if(message[2] == REJ1 || message[2] == REJ0){
             printf("NACK\n");
@@ -195,7 +195,7 @@ int byteStuffing(unsigned char* buf, int len, unsigned char* result){
         size++;
     }
 
-    printf("bcc2: %d\n", (int) bcc2);
+    //printf("bcc2: %d\n", (int) bcc2);
     result[size] = FLAG;
     size++;
     return size;
@@ -309,14 +309,14 @@ int llopen_receiver(char * port){
             perror("Error reading SET from fd");
             exit(-1);
         }*/
-        printf("set_message: %s\n", set_message);
+        //printf("set_message: %s\n", set_message);
 
         if(verifyFrame(set_message, SET)==0)
             break;
     }
 
     int result = sendMessageReceiver(fd, UA);
-    printf("UA result: %d\n", result);
+    //printf("UA result: %d\n", result);
 
     return fd;
 }
@@ -344,43 +344,47 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
         exit(-1);
     }
 
-    printf("Frame: %s\n", frame);
+    //printf("Frame: %s\n", frame);
     return size;
 }
 
 int llwrite(int fd, unsigned char *buffer, int length){
-    printf("llwrite starting\n");
+    printf("Sending packet...\n");
     int counter;
     unsigned char byte;
-    alarmSetup();
+    int flag;
     do
     {
+        alarmSetup();
+        flag = FALSE;
         counter = writeFrameI(fd, buffer, length);
         alarm(ALARM_TIME);  
         
         unsigned char answer[5];
-        
+        //printf("Sendtries llwrite: %d\n", sendTries);
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading RR/REJ from fd");
-                exit(-1);
+                flag = TRUE;
+                break;
+                //exit(-1);
             }
             answer[i] = byte;
         }
-
-        int result = verifyFrame(answer, DATA_CTRL);
-        printf("result: %d\n", result);
-        if(result == FALSE){
-            continue;
+        if(!flag){
+            int result = verifyFrame(answer, DATA_CTRL);
+            //printf("result: %d\n", result);
+            if(result == FALSE)
+                continue;
+            printf("RR received\n");
         }
         else{
           alarmFlag=FALSE;
-          sendTries=0;
+          //sendTries=0;
           alarm(0);
-          printf("RR received: %s\n", answer);
         }
-        
-    } while (sendTries < MAX_TRIES && alarmFlag);
+
+    } while (sendTries <= MAX_TRIES && alarmFlag);
 
     
     if(sendTries == MAX_TRIES){
@@ -470,6 +474,7 @@ int checkBCCs(unsigned char *buffer, int length, unsigned char *frame, int size)
 
 
 int llread(int fd, unsigned char *buffer){
+    printf("Receiving packet...\n");
     unsigned char frame[131078], aux[65537];
 
     int framelen = readFrameI(fd, frame);
@@ -486,7 +491,7 @@ int llread(int fd, unsigned char *buffer){
             for(int i = 0; i < aux_length-1; i++){
                 buffer[i] = aux[i];
             }
-            printf("buffer: %s\n", buffer);
+            //printf("buffer: %s\n", buffer);
             if(frame[2]==FI_CTRL1){
                 response[2] = (char)RR0;
                 response[3] = (char)(A_ADRESS ^ RR0);
@@ -517,7 +522,7 @@ int llread(int fd, unsigned char *buffer){
             response[3] = (char)(A_ADRESS ^ REJ1);
         }
     }
-    printf("Response: %s\n", response);
+    //printf("Response: %s\n", response);
     
     
     write(fd,response,5);
@@ -537,7 +542,7 @@ int llclose_transmitter(int fd){
 }
 
 int llclose_receiver(int fd){
-    int aux;
+    //int aux;
     char disc_message[5], byte;
     while(1) {
         
@@ -560,7 +565,7 @@ int llclose_receiver(int fd){
 
     sendMessageReceiver(fd, DISC);
 
-    int aux2;
+    //int aux2;
     char ua_message[5], byte2;
     while(1) {
         
@@ -570,7 +575,7 @@ int llclose_receiver(int fd){
                 exit(-1);
             }
             ua_message[i] = byte2;
-            printf("ua_message: %d\n", (int)ua_message[i]);
+            //printf("ua_message: %d\n", (int)ua_message[i]);
         }
 
         /*if (read(fd, ua_message, 5) == -1) {
