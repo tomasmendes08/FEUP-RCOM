@@ -211,8 +211,11 @@ int readFile(int fd){
 }
 
 int main(int argc, char** argv){
-    int fd;//, c, res;
-    //int i, sum = 0, speed = 0;
+    int fd;
+    int ps = 1024;
+    long br = 0xB38400;
+    char auxps[100];
+    char auxbr[100];
 
     if (argc < 4 && ((strcmp("/dev/ttyS10", argv[1])!=0) &&
   	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
@@ -223,14 +226,33 @@ int main(int argc, char** argv){
     }
     int arg = atoi(argv[2]);
     //int data_packet_size = atoi(argv[3]); //passar para a struct
-
+    if(argc > 3){
+        for(size_t i = 4; i < argc; i++){
+            if(sizeof(argv[i])/sizeof(argv[i][0])>=3){
+                if(argv[i][0]=='p' && argv[i][1]=='s' && argv[i][2]=='='){
+                    memcpy(auxps, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
+                    //printf("PS Aux: %s\n", auxps);
+                    ps = atoi(auxps);
+                    //printf("PS Int: %d\n", ps);
+                }
+                if(argv[i][0]=='b' && argv[i][1]=='r' && argv[i][2]=='='){
+                    memcpy(auxbr, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
+                    //printf("BR Aux: %s\n", auxbr);
+                    br = strtol(auxbr,NULL,16);
+                    //printf("BR Long: %ld\n", br);
+                }
+            }
+        }
+    }
     if(arg == TRANSMITTER){
         if(argc < 4){
-            printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (PacketSize) \n\tex: nserial /dev/ttyS1 1 filename.jpg 1024\n");
+            printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg 1024\n");
             exit(-1);
         }
-        if(argc >= 5) applicationLayer.packetSize = atoi(argv[4]);
-        else applicationLayer.packetSize = 1024;
+        /*if(argc >= 5) applicationLayer.packetSize = atoi(argv[4]);
+        else applicationLayer.packetSize = 1024;*/
+        applicationLayer.packetSize = ps;
+        setLinkLayerStruct(br);
         readFileData(argv[3]);
         fd = llopen(argv[1], TRANSMITTER);
         sendFile(fd);
@@ -242,6 +264,7 @@ int main(int argc, char** argv){
             applicationLayer.fileDestName = argv[3];
         }
         else applicationLayer.fileDestName = "none";
+        setLinkLayerStruct(br);
         readFile(fd);
         llclose_receiver(fd);
     }

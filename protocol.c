@@ -4,9 +4,9 @@ LinkLayer linkLayer;
 int success = FALSE;
 struct termios oldtio;
 
-int setLinkLayerStruct(){
+int setLinkLayerStruct(long baudRate){
     linkLayer.sequenceNumber = 0;
-    linkLayer.baudRate = BAUDRATE;
+    linkLayer.baudRate = baudRate;
 }
 
 
@@ -14,6 +14,7 @@ int sendMessageTransmitter(int fd, int type){
     char byte;
     char message[5];
     char receiver_message[5];
+    sendTries = 0;
     do{
       alarmSetup();
       int flag = FALSE;
@@ -54,15 +55,16 @@ int sendMessageTransmitter(int fd, int type){
           if (verifyFrame(receiver_message, DISC)) {
               if (verifyFrame(receiver_message, UA)) continue;
               else {
-                  alarmFlag = FALSE;
-                  //sendTries=0;
-                  alarm(0);
+                  break;
               }
           } else {
-              alarmFlag = FALSE;
-              //sendTries=0;
-              alarm(0);
+              break;
           }
+      }
+      else {
+          //alarmFlag = FALSE;
+          //sendTries=0;
+          alarm(0);
       }
       /*if(read(fd, receiver_message, 5)==-1){
           perror("Error reading UA from fd");
@@ -70,7 +72,7 @@ int sendMessageTransmitter(int fd, int type){
       }*/
 
 
-    } while(sendTries <= MAX_TRIES && alarmFlag);
+    } while(sendTries < MAX_TRIES && alarmFlag);
     
     if(sendTries == MAX_TRIES){
       sendTries = 0;
@@ -245,7 +247,7 @@ int openPort(char *port, struct termios *oldtio){
     }
 
     bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    newtio.c_cflag = linkLayer.baudRate | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
 
@@ -353,9 +355,10 @@ int llwrite(int fd, unsigned char *buffer, int length){
     int counter;
     unsigned char byte;
     int flag;
+    sendTries = 0;
+    alarmSetup();
     do
     {
-        alarmSetup();
         flag = FALSE;
         counter = writeFrameI(fd, buffer, length);
         alarm(ALARM_TIME);  
@@ -376,15 +379,18 @@ int llwrite(int fd, unsigned char *buffer, int length){
             //printf("result: %d\n", result);
             if(result == FALSE)
                 continue;
-            printf("RR received\n");
+            else{
+                printf("RR received\n");
+                break;
+            }
         }
         else{
-          alarmFlag=FALSE;
+          //alarmFlag=FALSE;
           //sendTries=0;
           alarm(0);
         }
-
-    } while (sendTries <= MAX_TRIES && alarmFlag);
+        //printf("do while flag: %d\n", sendTries<MAX_TRIES && alarmFlag);
+    } while (sendTries < MAX_TRIES && alarmFlag);
 
     
     if(sendTries == MAX_TRIES){
