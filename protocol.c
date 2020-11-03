@@ -4,11 +4,20 @@ LinkLayer linkLayer;
 int success = FALSE;
 struct termios oldtio;
 
-int setLinkLayerStruct(long baudRate){
+int setLinkLayerStruct(speed_t baudRate){
     linkLayer.sequenceNumber = 0;
     linkLayer.baudRate = baudRate;
 }
 
+int llopen(char *port, int status){
+    int fd;
+    if(status == TRANSMITTER)
+        fd = llopen_transmitter(port);
+    else
+        fd = llopen_receiver(port);
+
+    return fd;
+}
 
 int sendMessageTransmitter(int fd, int type){
     char byte;
@@ -148,16 +157,17 @@ int verifyFrame(unsigned char *message, int type){
       if(message[2] != RR1 && message[2] != RR0){
         if(message[2] == REJ1 || message[2] == REJ0){
             printf("NACK\n");
+            return 1;
         }
       }
       else{
           printf("ACK\n");
-          success = TRUE;
+          success = 0;
       }
 
       if(message[3] != (A_ADRESS ^ message[2])){
         perror("Error in verifyFrame (RR / REJ -> XOR)");
-        return FALSE;
+        return 1;
       } 
       
       return success;
@@ -250,7 +260,6 @@ int openPort(char *port, struct termios *oldtio){
     newtio.c_cflag = linkLayer.baudRate | CS8 | CLOCAL | CREAD;
     newtio.c_iflag = IGNPAR;
     newtio.c_oflag = 0;
-
     /* set input mode (non-canonical, no echo,...) */
     newtio.c_lflag = 0;
 
@@ -261,9 +270,11 @@ int openPort(char *port, struct termios *oldtio){
   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
   leitura do(s) pr�ximo(s) caracter(es)
 */
-
+    cfsetspeed(&newtio,B230400);
+    /*printf("Baudrate: %d\n", (speed_t)linkLayer.baudRate);
+    printf("CFGetOSpeed: %d\n", cfgetospeed(&newtio));
+    printf("CFGetISpeed: %d\n", cfgetispeed(&newtio));*/
     tcflush(fd, TCIOFLUSH);
-
     if (tcsetattr(fd,TCSANOW,&newtio) == -1) {
         perror("tcsetattr");
         exit(-1);
@@ -377,7 +388,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
         if(!flag){
             int result = verifyFrame(answer, DATA_CTRL);
             //printf("result: %d\n", result);
-            if(result == FALSE)
+            if(result == TRUE)
                 continue;
             else{
                 printf("RR received\n");

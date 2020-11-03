@@ -16,7 +16,7 @@ typedef struct{
 
 }ApplicationLayer;
 
-int llopen(char *port, int status);
+//int llopen(char *port, int status);
 
 void readFileData(char *filename);
 
