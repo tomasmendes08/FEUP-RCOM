@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define BAUDRATE B38400
+//#define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
@@ -41,9 +41,9 @@ typedef struct{
 
 }LinkLayer;
 
-int setLinkLayerStruct();
+int setLinkLayerStruct(long baudrate);
 
-typedef enum {START, FLAG_R, A_R, C_R, BCC1_R, DATA_R, END, ERROR} enumStates;
+typedef enum {START, FLAG_R, A_R, C_R, BCC1_R, DATA_R, END} enumStates;
 
 int sendMessageTransmitter(int fd, int type);
 

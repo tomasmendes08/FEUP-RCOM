@@ -7,8 +7,10 @@
 
 typedef struct{
 
-    char *originalFileName;            
-    int originalFileSize;
+    char *fileName;
+    char *fileDestName;
+    int packetSize;
+    int fileSize;
     int fileDes;
     int fileDesNewFile;
     int porta_serie;
