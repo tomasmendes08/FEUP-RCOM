@@ -45,7 +45,7 @@ int sendMessageTransmitter(int fd, int type){
       for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading UA/DISC from fd");
-                exit(-1);
+                return 1;
             }
             receiver_message[i] = byte;
       }
@@ -103,7 +103,7 @@ int sendMessageReceiver(int fd, int type){
     int result = write(fd, message, 5);
     if(result == -1){
         perror("Writing UA message");
-        exit(-1);
+        return 1;
     }
 
     if(type==UA) printf("UA: %s\n", message);
@@ -113,7 +113,6 @@ int sendMessageReceiver(int fd, int type){
 }
 
 int verifyFrame(unsigned char *message, int type){
-  printf("message[0]: %d\nmessage[1]: %d\n", (int) message[0], (int) message[1]);
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
     return 1;
@@ -195,7 +194,6 @@ int byteStuffing(unsigned char* buf, int len, unsigned char* result){
         size++;
     }
 
-    printf("bcc2: %d\n", (int) bcc2);
     result[size] = FLAG;
     size++;
     return size;
@@ -300,7 +298,7 @@ int llopen_receiver(char * port){
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading SET from fd");
-                exit(-1);
+                return -1;
             }
             set_message[i] = byte;
         }
@@ -363,7 +361,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading RR/REJ from fd");
-                exit(-1);
+                return 1;
             }
             answer[i] = byte;
         }
@@ -437,7 +435,7 @@ int stateMachine(enumStates* state, unsigned char byte){
     return 0;
 }
 
-int readFrameI(int fd, char *buffer){
+int readFrameI(int fd, unsigned char *buffer){
     int len = 0;
     unsigned char currentByte;
     enumStates state = START;
@@ -544,7 +542,7 @@ int llclose_receiver(int fd){
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading DISC from fd");
-                exit(-1);
+                return 1;
             }
             disc_message[i] = byte;
         }
@@ -567,7 +565,7 @@ int llclose_receiver(int fd){
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte2, 1) == -1) {
                 perror("Error reading UA from fd");
-                exit(-1);
+                return 1;
             }
             ua_message[i] = byte2;
             printf("ua_message: %d\n", (int)ua_message[i]);

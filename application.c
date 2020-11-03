@@ -12,6 +12,11 @@ int llopen(char *port, int status){
     return fd;
 }
 
+void setUpPacketSize(int packet_size){
+    //applicationLayer.duplicateFileName = filename;
+    applicationLayer.duplicatePacketSize = packet_size;
+}
+
 void readFileData(char *filename){
 
     int fd = open(filename, O_RDONLY);
@@ -20,34 +25,35 @@ void readFileData(char *filename){
 
     printf("fd: %d\n", fd);
     applicationLayer.fileDes = fd;
-    applicationLayer.fileSize = stat_buff.st_size;
-    applicationLayer.fileName = filename;
+    applicationLayer.originalFileSize = stat_buff.st_size;
+    applicationLayer.originalFileName = filename;
 }
 
 int createControlPacket(int fd, int type){
-    unsigned char controlPacket[1024]="";
+    unsigned char controlPacket[1024];
     
     if(type == START) controlPacket[0] = 0x02;
     else if(type == END) controlPacket[0] = 0x03;
     controlPacket[1] = 0x00;
-    controlPacket[2] = sizeof(applicationLayer.fileSize);
-    controlPacket[3] = (applicationLayer.fileSize >> 24) & 0xFF;
-    controlPacket[4] = (applicationLayer.fileSize >> 16) & 0xFF;
-    controlPacket[5] = (applicationLayer.fileSize >> 8) & 0xFF;
-    controlPacket[6] = applicationLayer.fileSize & 0xFF;
+    controlPacket[2] = sizeof(applicationLayer.originalFileSize);
+    controlPacket[3] = (applicationLayer.originalFileSize >> 24) & 0xFF;
+    controlPacket[4] = (applicationLayer.originalFileSize >> 16) & 0xFF;
+    controlPacket[5] = (applicationLayer.originalFileSize >> 8) & 0xFF;
+    controlPacket[6] = applicationLayer.originalFileSize & 0xFF;
 
     controlPacket[7] = 0x01;
-    controlPacket[8] = strlen(applicationLayer.fileName);
-    for(int i = 0; i < strlen(applicationLayer.fileName); i++){
-        controlPacket[i+9] = applicationLayer.fileName[i];
+    controlPacket[8] = strlen(applicationLayer.originalFileName);
+    for(int i = 0; i < strlen(applicationLayer.originalFileName); i++){
+        controlPacket[i+9] = applicationLayer.originalFileName[i];
     }
 
-    int length = 9*sizeof(unsigned char) + strlen(applicationLayer.fileName);
 
+    int length = 9*sizeof(unsigned char) + strlen(applicationLayer.originalFileName);
     printf("sup\n");
     llwrite(fd, controlPacket, length);
     printf("sup2\n");
 
+    printf("len: %d\n", length);
     return length;
 }
 
@@ -92,33 +98,32 @@ int readControlPacket(int fd){
         }
     }
 
-    applicationLayer.fileDesNewFile = open("teste/godmarega.jpg", O_CREAT | O_WRONLY | O_APPEND, 0664);
-    
+    applicationLayer.fileDesNewFile = open(applicationLayer.duplicateFileName, O_CREAT | O_WRONLY | O_APPEND, 0664);
+    printf("cheguei\n");
     return 0;
 }
 
 int createDataPacket(){
-    char buffer[1024];
-    int packets_to_send = applicationLayer.fileSize/1024;
+    char buffer[applicationLayer.duplicatePacketSize];
+    int packets_to_send = applicationLayer.originalFileSize/applicationLayer.duplicatePacketSize;
     int read_bytes = 0, packets_sent = 0;
 
-    if(applicationLayer.fileSize % 1024 != 0) packets_to_send++;
-    printf("packets_to_send: %d\n", packets_to_send);
+    if(applicationLayer.originalFileSize % applicationLayer.duplicatePacketSize != 0) packets_to_send++;
 
     while(packets_sent < packets_to_send){
-        if((read_bytes = read(applicationLayer.fileDes, buffer, 1024)) == -1){
+        if((read_bytes = read(applicationLayer.fileDes, buffer, applicationLayer.duplicatePacketSize)) == -1){
             perror("Error reading");
         }
 
-        unsigned char packet[1028];
+        unsigned char packet[applicationLayer.duplicatePacketSize+4];
         packet[0] = DATA;
         packet[1] = packets_sent;
         packets_sent++;
         packet[2] = read_bytes/256;
         packet[3] = read_bytes%256;
 
-        int j = 0;
-        for(int i = 4; i < 1028; i++){
+        int j = 0;  
+        for(int i = 4; i < applicationLayer.duplicatePacketSize; i++){
             packet[i] = buffer[j];
             j++;
         }
@@ -163,7 +168,7 @@ int sendFile(int fd){
 
 int readFile(int fd){
     applicationLayer.porta_serie = fd;
-    unsigned char buffer[1028];
+    unsigned char buffer[applicationLayer.duplicatePacketSize+4];
 
     readControlPacket(applicationLayer.porta_serie);
 
@@ -187,15 +192,20 @@ int main(int argc, char** argv){
     int fd, c, res;
     int i, sum = 0, speed = 0;
     
-    /*if ( (argc < 3) || 
+    if ( ((argc != 4) && (argc != 5)) || 
   	     ((strcmp("/dev/ttyS10", argv[1])!=0) && 
-  	      (strcmp("/dev/ttyS11", argv[1])!=0) )) {
-        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename(TRANSMITTER)\n\tex: nserial /dev/ttyS1 1 godmarega\n");      
+  	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
+          (strcmp("/dev/ttyS0", argv[1])!=0) && 
+  	      (strcmp("/dev/ttyS1", argv[1])!=0) )) {
+        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename PacketSize(RECEIVER ONLY)\n\tex: nserial /dev/ttyS1 1 pinguim.gif\n");      
         exit(-1);
-    }*/
+    }
 
     int arg = atoi(argv[2]);
-    //int data_packet_size = atoi(argv[3]); //passar para a struct
+
+    int data_packet_size = atoi(argv[4]); //passar para a struct
+
+    setUpPacketSize(data_packet_size);
 
     if(arg == TRANSMITTER){
         readFileData(argv[3]);
@@ -204,9 +214,14 @@ int main(int argc, char** argv){
         llclose_transmitter(fd);
     }
     else if(arg == RECEIVER){
+        applicationLayer.duplicateFileName = argv[3];
         fd = llopen(argv[1], RECEIVER);
         readFile(fd);
         llclose_receiver(fd);
+    }
+    else{
+        printf("Invalid FLAG (TRANSMITTER or RECEIVER)\n");
+        exit(-1);
     }
     
     return 0;
