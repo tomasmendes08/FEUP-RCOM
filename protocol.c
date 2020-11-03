@@ -17,7 +17,9 @@ int sendMessageTransmitter(int fd, int type){
     sendTries = 0;
     do{
       alarmSetup();
+
       int flag = FALSE;
+
       message[0] = FLAG;
       message[1] = A_ADRESS;
       
@@ -43,21 +45,22 @@ int sendMessageTransmitter(int fd, int type){
       alarm(ALARM_TIME);
       
       for(int i = 0; i < 5; i++){
-            if (read(fd, &byte, 1) == -1) {
-                perror("Error reading UA/DISC from fd");
-                flag = TRUE;
-                break;
-                //exit(-1);
-            }
-            receiver_message[i] = byte;
+        if (read(fd, &byte, 1) == -1) {
+            perror("Error reading UA/DISC from fd");
+            flag = TRUE;
+            break;
+        }
+        receiver_message[i] = byte;
       }
+
       if(!flag) {
           if (verifyFrame(receiver_message, DISC)) {
               if (verifyFrame(receiver_message, UA)) continue;
               else {
                   break;
               }
-          } else {
+          } 
+          else {
               break;
           }
       }
@@ -66,11 +69,6 @@ int sendMessageTransmitter(int fd, int type){
           //sendTries=0;
           alarm(0);
       }
-      /*if(read(fd, receiver_message, 5)==-1){
-          perror("Error reading UA from fd");
-          continue;
-      }*/
-
 
     } while(sendTries < MAX_TRIES && alarmFlag);
     
@@ -148,16 +146,17 @@ int verifyFrame(unsigned char *message, int type){
       if(message[2] != RR1 && message[2] != RR0){
         if(message[2] == REJ1 || message[2] == REJ0){
             printf("NACK\n");
+            return 1;
         }
       }
       else{
           printf("ACK\n");
-          success = TRUE;
+          success = 0;
       }
 
       if(message[3] != (A_ADRESS ^ message[2])){
         perror("Error in verifyFrame (RR / REJ -> XOR)");
-        return FALSE;
+        return 1;
       } 
       
       return success;
@@ -204,10 +203,6 @@ int byteStuffing(unsigned char* buf, int len, unsigned char* result){
 }
 
 int byteDestuffing(char* buf, int len, char* result){
-    /*result[0] = buf[0];
-    result[1] = buf[1];
-    result[2] = buf[2];
-    result[3] = buf[3];*/
     int j = 0;
     int i;
     for (i = 4; i < len - 1; i++) {
@@ -307,12 +302,6 @@ int llopen_receiver(char * port){
             set_message[i] = byte;
         }
 
-       /* if (read(fd, set_message, 5) == -1) {
-            perror("Error reading SET from fd");
-            exit(-1);
-        }*/
-        //printf("set_message: %s\n", set_message);
-
         if(verifyFrame(set_message, SET)==0)
             break;
     }
@@ -370,14 +359,13 @@ int llwrite(int fd, unsigned char *buffer, int length){
                 perror("Error reading RR/REJ from fd");
                 flag = TRUE;
                 break;
-                //exit(-1);
             }
             answer[i] = byte;
         }
         if(!flag){
             int result = verifyFrame(answer, DATA_CTRL);
             //printf("result: %d\n", result);
-            if(result == FALSE)
+            if(result == 1)
                 continue;
             else{
                 printf("RR received\n");

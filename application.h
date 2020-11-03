@@ -14,9 +14,6 @@ typedef struct{
     int fileDes;
     int fileDesNewFile;
     int porta_serie;
-    char *duplicateFileName;
-    int duplicatePacketSize;
-    int controlPacketSize;
 
 }ApplicationLayer;
 

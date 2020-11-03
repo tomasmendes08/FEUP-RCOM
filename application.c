@@ -11,11 +11,7 @@ int llopen(char *port, int status){
 
     return fd;
 }
-/*
-void setUpPacketSize(int packet_size){
-    applicationLayer.duplicateFileName = filename;
-    applicationLayer.duplicatePacketSize = packet_size;
-}*/
+
 
 void readFileData(char *filename){
 
@@ -23,10 +19,9 @@ void readFileData(char *filename){
     struct stat stat_buff;
     fstat(fd, &stat_buff);
 
-    //printf("fd: %d\n", fd);
     applicationLayer.fileDes = fd;
-    applicationLayer.originalFileSize = stat_buff.st_size;
-    applicationLayer.originalFileName = filename;
+    applicationLayer.fileSize = stat_buff.st_size;
+    applicationLayer.fileName = filename;
 }
 
 int createControlPacket(int fd, int type){
@@ -35,19 +30,19 @@ int createControlPacket(int fd, int type){
     if(type == START) controlPacket[0] = 0x02;
     else if(type == END) controlPacket[0] = 0x03;
     controlPacket[1] = 0x00;
-    controlPacket[2] = sizeof(applicationLayer.originalFileSize);
-    controlPacket[3] = (applicationLayer.originalFileSize >> 24) & 0xFF;
-    controlPacket[4] = (applicationLayer.originalFileSize >> 16) & 0xFF;
-    controlPacket[5] = (applicationLayer.originalFileSize >> 8) & 0xFF;
-    controlPacket[6] = applicationLayer.originalFileSize & 0xFF;
+    controlPacket[2] = sizeof(applicationLayer.fileSize);
+    controlPacket[3] = (applicationLayer.fileSize >> 24) & 0xFF;
+    controlPacket[4] = (applicationLayer.fileSize >> 16) & 0xFF;
+    controlPacket[5] = (applicationLayer.fileSize >> 8) & 0xFF;
+    controlPacket[6] = applicationLayer.fileSize & 0xFF;
 
     controlPacket[7] = 0x01;
-    controlPacket[8] = strlen(applicationLayer.originalFileName);
-    for(int i = 0; i < strlen(applicationLayer.originalFileName); i++){
-        controlPacket[i+9] = applicationLayer.originalFileName[i];
+    controlPacket[8] = strlen(applicationLayer.fileName);
+    for(int i = 0; i < strlen(applicationLayer.fileName); i++){
+        controlPacket[i+9] = applicationLayer.fileName[i];
     }
 
-
+    int length = 9*sizeof(unsigned char) + strlen(applicationLayer.fileName);
     llwrite(fd, controlPacket, length);
 
     printf("len: %d\n", length);
@@ -104,14 +99,17 @@ int readControlPacket(int fd){
 int createDataPacket(){
     char buffer[applicationLayer.packetSize];
     int packets_to_send = applicationLayer.fileSize/applicationLayer.packetSize;
-    int read_bytes = 0, packets_sent = 0;
     int lastbyte = applicationLayer.fileSize % applicationLayer.packetSize, flag = FALSE;
+    int read_bytes = 0, packets_sent = 0;
     int size;
+    
     if(lastbyte != 0){
         flag = TRUE;
     }
+    
     //printf("packets_to_send: %d\n", flag?packets_to_send+1:packets_to_send);
     //printf("Packets Sent: %d\n Packets to send: %d\n Lastbyte: %d\n Packet Size: %d\n", packets_sent, packets_to_send, lastbyte, applicationLayer.packetSize);
+    
     while(packets_sent <= packets_to_send){
         int count = 0;
         if((packets_sent == packets_to_send) && flag){
@@ -203,14 +201,17 @@ int readFile(int fd){
         
         }
     }
+
     struct stat stat_buff;
     fstat(applicationLayer.fileDesNewFile, &stat_buff);
+    
     if(stat_buff.st_size == applicationLayer.fileSize){
         printf("The received file size is the same as the sent file. No data loss\n");
     }
     else{
         printf("The received file size is not the same as the sent file. Possible data loss\n");
     }
+    
     close(applicationLayer.fileDesNewFile);
     return 0;
 }
@@ -222,7 +223,7 @@ int main(int argc, char** argv){
     char auxps[100];
     char auxbr[100];
 
-    if (argc < 4 && ((strcmp("/dev/ttyS10", argv[1])!=0) &&
+    if (argc < 4 || ((strcmp("/dev/ttyS10", argv[1])!=0) &&
   	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
           (strcmp("/dev/ttyS1", argv[1])!=0) &&
           (strcmp("/dev/ttyS0", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
