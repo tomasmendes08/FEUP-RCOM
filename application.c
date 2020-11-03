@@ -2,21 +2,6 @@
 
 ApplicationLayer applicationLayer;
 
-int llopen(char *port, int status){
-    int fd;
-    if(status == TRANSMITTER)
-        fd = llopen_transmitter(port);
-    else
-        fd = llopen_receiver(port);
-
-    return fd;
-}
-/*
-void setUpPacketSize(int packet_size){
-    applicationLayer.duplicateFileName = filename;
-    applicationLayer.duplicatePacketSize = packet_size;
-}*/
-
 void readFileData(char *filename){
 
     int fd = open(filename, O_RDONLY);
@@ -25,8 +10,8 @@ void readFileData(char *filename){
 
     //printf("fd: %d\n", fd);
     applicationLayer.fileDes = fd;
-    applicationLayer.originalFileSize = stat_buff.st_size;
-    applicationLayer.originalFileName = filename;
+    applicationLayer.fileSize = stat_buff.st_size;
+    applicationLayer.fileName = filename;
 }
 
 int createControlPacket(int fd, int type){
@@ -35,22 +20,22 @@ int createControlPacket(int fd, int type){
     if(type == START) controlPacket[0] = 0x02;
     else if(type == END) controlPacket[0] = 0x03;
     controlPacket[1] = 0x00;
-    controlPacket[2] = sizeof(applicationLayer.originalFileSize);
-    controlPacket[3] = (applicationLayer.originalFileSize >> 24) & 0xFF;
-    controlPacket[4] = (applicationLayer.originalFileSize >> 16) & 0xFF;
-    controlPacket[5] = (applicationLayer.originalFileSize >> 8) & 0xFF;
-    controlPacket[6] = applicationLayer.originalFileSize & 0xFF;
+    controlPacket[2] = sizeof(applicationLayer.fileSize);
+    controlPacket[3] = (applicationLayer.fileSize >> 24) & 0xFF;
+    controlPacket[4] = (applicationLayer.fileSize >> 16) & 0xFF;
+    controlPacket[5] = (applicationLayer.fileSize >> 8) & 0xFF;
+    controlPacket[6] = applicationLayer.fileSize & 0xFF;
 
     controlPacket[7] = 0x01;
-    controlPacket[8] = strlen(applicationLayer.originalFileName);
-    for(int i = 0; i < strlen(applicationLayer.originalFileName); i++){
-        controlPacket[i+9] = applicationLayer.originalFileName[i];
+    controlPacket[8] = strlen(applicationLayer.fileName);
+    for(int i = 0; i < strlen(applicationLayer.fileName); i++){
+        controlPacket[i+9] = applicationLayer.fileName[i];
     }
 
+    int length = 9*sizeof(unsigned char) + strlen(applicationLayer.fileName);
 
     llwrite(fd, controlPacket, length);
 
-    printf("len: %d\n", length);
     return length;
 }
 
@@ -215,6 +200,52 @@ int readFile(int fd){
     return 0;
 }
 
+speed_t checkBaudrate(long br){
+    switch (br){
+        case 0xB0:
+            return B0;
+        case 0xB50:
+            return B50;
+        case 0xB75:
+            return B75;
+        case 0xB110:
+            return B110;
+        case 0xB134:
+            return B134;
+        case 0xB150:
+            return B150;
+        case 0xB200:
+            return B200;
+        case 0xB300:
+            return B300;
+        case 0xB600:
+            return B600;
+        case 0xB1200:
+            return B1200;
+        case 0xB1800:
+            return B1800;
+        case 0xB2400:
+            return B2400;
+        case 0xB4800:
+            return B4800;
+        case 0xB9600:
+            return B9600;
+        case 0xB19200:
+            return B19200;
+        case 0xB38400:
+            return B38400;
+        case 0xB57600:
+            return B57600;
+        case 0xB115200:
+            return B115200;
+        case 0xB230400:
+            return B230400;
+        default:
+            printf("Bad baudrate value. Using default (B38400)");
+            return B38400;
+    }
+}
+
 int main(int argc, char** argv){
     int fd;
     int ps = 1024;
@@ -222,7 +253,7 @@ int main(int argc, char** argv){
     char auxps[100];
     char auxbr[100];
 
-    if (argc < 4 && ((strcmp("/dev/ttyS10", argv[1])!=0) &&
+    if (argc < 4 || ((strcmp("/dev/ttyS10", argv[1])!=0) &&
   	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
           (strcmp("/dev/ttyS1", argv[1])!=0) &&
           (strcmp("/dev/ttyS0", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
@@ -249,6 +280,7 @@ int main(int argc, char** argv){
             }
         }
     }
+
     if(arg == TRANSMITTER){
         if(argc < 4){
             printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg 1024\n");
@@ -257,26 +289,21 @@ int main(int argc, char** argv){
         /*if(argc >= 5) applicationLayer.packetSize = atoi(argv[4]);
         else applicationLayer.packetSize = 1024;*/
         applicationLayer.packetSize = ps;
-        setLinkLayerStruct(br);
+        setLinkLayerStruct(checkBaudrate(br));
         readFileData(argv[3]);
         fd = llopen(argv[1], TRANSMITTER);
         sendFile(fd);
         llclose_transmitter(fd);
     }
     else if(arg == RECEIVER){
-        //applicationLayer.duplicateFileName = argv[3];
+        setLinkLayerStruct(checkBaudrate(br));
         fd = llopen(argv[1], RECEIVER);
         if(argc >= 4){
             applicationLayer.fileDestName = argv[3];
         }
         else applicationLayer.fileDestName = "none";
-        setLinkLayerStruct(br);
         readFile(fd);
         llclose_receiver(fd);
-    }
-    else{
-        printf("Invalid FLAG (TRANSMITTER or RECEIVER)\n");
-        exit(-1);
     }
     
     return 0;

@@ -41,9 +41,11 @@ typedef struct{
 
 }LinkLayer;
 
-int setLinkLayerStruct(long baudrate);
+int setLinkLayerStruct(speed_t baudrate);
 
 typedef enum {START, FLAG_R, A_R, C_R, BCC1_R, DATA_R, END} enumStates;
+
+int llopen(char *port, int status);
 
 int sendMessageTransmitter(int fd, int type);
 
