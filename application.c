@@ -283,7 +283,7 @@ int main(int argc, char** argv){
 
     if(arg == TRANSMITTER){
         if(argc < 4){
-            printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg 1024\n");
+            printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
             exit(-1);
         }
         /*if(argc >= 5) applicationLayer.packetSize = atoi(argv[4]);
