@@ -253,15 +253,16 @@ int main(int argc, char** argv){
     char auxps[100];
     char auxbr[100];
 
-    if (argc < 4 || ((strcmp("/dev/ttyS10", argv[1])!=0) &&
+    if (argc < 3 || ((strcmp("/dev/ttyS10", argv[1])!=0) &&
   	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
           (strcmp("/dev/ttyS1", argv[1])!=0) &&
           (strcmp("/dev/ttyS0", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
-        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg 1024\n");
+        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
         exit(-1);
     }
+
     int arg = atoi(argv[2]);
-    //int data_packet_size = atoi(argv[3]); //passar para a struct
+
     if(argc > 3){
         for(size_t i = 4; i < argc; i++){
             if(sizeof(argv[i])/sizeof(argv[i][0])>=3){

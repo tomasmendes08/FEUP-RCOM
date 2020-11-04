@@ -40,6 +40,7 @@ int sendMessageTransmitter(int fd, int type){
       }
 
       message[4] = FLAG;
+      printf("message: %s\n", message);
       
       if(type == SET) printf("SET sent\n");
       else if(type == DISC) printf("DISC sent\n");
