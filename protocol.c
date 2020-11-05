@@ -366,11 +366,11 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     
     if(linkLayer.sequenceNumber == 0) {
         frame[2] = FI_CTRL0;
-        //linkLayer.sequenceNumber = 1;
+        linkLayer.sequenceNumber = 1;
     }
     else if(linkLayer.sequenceNumber == 1) {
         frame[2] = FI_CTRL1;
-        //linkLayer.sequenceNumber = 0;
+        linkLayer.sequenceNumber = 0;
     }
     frame[3] = (frame[1] ^ frame[2]);
     
@@ -396,6 +396,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
     int counter;
     unsigned char byte;
     int flag;
+    enumStates state;
     sendTries = 0;
     alarmSetup();
     do
@@ -403,11 +404,18 @@ int llwrite(int fd, unsigned char *buffer, int length){
         flag = FALSE;
         counter = writeFrameI(fd, buffer, length);
         printf("packet sent...\n");
+        alarmFlag = FALSE;
         alarm(ALARM_TIME);  
         
         unsigned char answer[5];
-
-        for(int i = 0; i < 5; i++){
+        while(state != END && alarmFlag){
+            if(read(fd,&byte,1) < 0){
+                perror("Error reading RR/REJ from fd");
+                flag = TRUE;
+            }
+            responseStateMachine(&state, &byte);
+        }
+        /*for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading RR/REJ from fd");
                 flag = TRUE;
@@ -415,12 +423,12 @@ int llwrite(int fd, unsigned char *buffer, int length){
                 //exit(-1);
             }
             answer[i] = byte;
-        }
-        if(flag){
+        }*/
+        /*if(flag){
             alarm(0);
 			alarmFlag = 1;
             continue;
-        }
+        }*/
         int result = verifyFrame(answer, DATA_CTRL);
         if(result == 1){
 			alarmFlag = 1;
@@ -430,7 +438,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
         if(!flag){
             if(result == 0){
                 printf("RR received\n");
-				alarm(0);
+                alarm(0);
 				if(linkLayer.sequenceNumber == 0) linkLayer.sequenceNumber = 1;
 				else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
                 break;
@@ -492,6 +500,45 @@ int stateMachine(enumStates* state, unsigned char byte){
             if (byte == FLAG) *state = END;
             break;
 
+        case END:
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+int responseStateMachine(enumStates* state, unsigned char byte){
+    switch (*state)
+    {
+        case START:
+            if (byte == FLAG) *state = FLAG_R;
+            break;
+
+            case FLAG_R:
+            if (byte == A_ADRESS) *state = A_R;
+            else if(byte == FLAG){
+                break;
+            }
+            else {
+                *state = START;
+            }
+            break;
+        case A_R:
+            if (byte == RR0|| byte == RR1 || REJ0 || REJ1) *state = C_R;
+            else if(byte == FLAG) *state = FLAG_R;
+            else *state = START;
+            break;
+        case C_R:
+            if (byte == (A_ADRESS ^ RR0) || byte == (A_ADRESS ^ RR1) || byte == (A_ADRESS ^ REJ0) || byte == (A_ADRESS ^ REJ1)){
+            *state = BCC1_R;
+            }
+            else if(byte == FLAG) *state = FLAG_R;
+            else *state = START;
+            break;
+        case BCC1_R:
+            if (byte == FLAG) *state = END;
+            break;
         case END:
             break;
         default:
