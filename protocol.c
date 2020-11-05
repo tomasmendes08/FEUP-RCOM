@@ -70,7 +70,7 @@ int sendMessageTransmitter(int fd, int type){
       }
 
       message[4] = FLAG;
-      printf("message: %s\n", message);
+      //printf("message: %s\n", message);
       
       if(type == SET) printf("SET sent\n");
       else if(type == DISC) printf("DISC sent\n");
@@ -157,7 +157,7 @@ int sendMessageReceiver(int fd, int type){
 int verifyFrame(unsigned char *message, int type){
 
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
-    perror("Error in verifyFrame");
+    printf("Error in verifyFrame\n");
     return 1;
   }
 
@@ -165,14 +165,14 @@ int verifyFrame(unsigned char *message, int type){
   {
     case SET:
       if(!(message[2]==SET_CTRL && message[3]==(A_ADRESS ^ SET_CTRL))){
-        perror("Error in verifyFrame (SET)");
+        printf("Error in verifyFrame (SET)\n");
         return 1;
       }
       printf("SET received\n");
       break;
     case UA:
       if(!(message[2]==UA_CTRL && message[3]==(A_ADRESS ^ UA_CTRL))){
-        perror("Error in verifyFrame (UA)");
+        printf("Error in verifyFrame (UA)\n");
         return 1;
       }
       printf("UA received\n");
@@ -197,7 +197,7 @@ int verifyFrame(unsigned char *message, int type){
       }
 
       if(message[3] != (A_ADRESS ^ message[2])){
-        perror("Error in verifyFrame (RR / REJ -> XOR)");
+        printf("Error in verifyFrame (RR / REJ -> XOR)\n");
         return 1;
       } 
       
@@ -407,14 +407,15 @@ int llwrite(int fd, unsigned char *buffer, int length){
         printf("packet sent...\n");
         alarmFlag = FALSE;
         alarm(ALARM_TIME);  
-        
+        //printf("AlarmFlag: %d\n", alarmFlag);
         unsigned char answer[5];
-        while(state != END && alarmFlag){
+        while(state != END && alarmFlag==0){
             if(read(fd,&byte,1) < 0){
                 perror("Error reading RR/REJ from fd");
                 flag=TRUE;
             }
             responseStateMachine(&state, byte, answer);
+            //printf("Answer: %s\n", answer);
         }
         /*for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
