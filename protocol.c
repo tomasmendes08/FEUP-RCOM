@@ -416,23 +416,25 @@ int llwrite(int fd, unsigned char *buffer, int length){
             }
             answer[i] = byte;
         }
+        if(flag){
+            alarm(0);
+            continue;
+        }
+        int result = verifyFrame(answer, DATA_CTRL);
+        if(result == 1){
+            continue;
+        }
         if(!flag){
-            int result = verifyFrame(answer, DATA_CTRL);
-
-            if(result == 1){
-                continue;
-            }
-            else{
-                Protstatistics.numOfRRsReceived++;
+            if(result == 0){
                 printf("RR received\n");
                 break;
             }
         }
-        else{
+        /*else{
           //alarmFlag=FALSE;
           //sendTries=0;
           alarm(0);
-        }
+        }*/
 
     } while (sendTries < MAX_TRIES && alarmFlag);
 
