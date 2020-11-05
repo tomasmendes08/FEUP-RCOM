@@ -50,9 +50,9 @@ int llopen(char *port, int status){
 }
 
 int sendMessageTransmitter(int fd, int type){
-    char byte;
-    char message[5];
-    char receiver_message[5];
+    unsigned char byte;
+    unsigned char message[5];
+    unsigned char receiver_message[5];
     sendTries = 0;
     do{
       alarmSetup();
@@ -93,7 +93,9 @@ int sendMessageTransmitter(int fd, int type){
       }
       if(!flag) {
           if (verifyFrame(receiver_message, DISC)) {
-              if (verifyFrame(receiver_message, UA)) continue;
+              if (verifyFrame(receiver_message, UA)) {
+                  continue;
+              }
               else {
                   break;
               }
@@ -113,7 +115,7 @@ int sendMessageTransmitter(int fd, int type){
     if(sendTries == MAX_TRIES){
       sendTries = 0;
       alarmFlag = FALSE;
-      Protstatistics.timeouts++;
+      //Protstatistics.timeouts++;
 
       perror("Timed out too many times");
       return 1;
@@ -123,7 +125,7 @@ int sendMessageTransmitter(int fd, int type){
 }
 
 int sendMessageReceiver(int fd, int type){
-    char message[5];
+    unsigned char message[5];
 
     message[0] = FLAG;
     message[1] = A_ADRESS;
@@ -331,7 +333,7 @@ int llopen_transmitter(char * port){
 int llopen_receiver(char * port){
     int fd = openPort(port, &oldtio);
 
-    char set_message[5], byte;
+    unsigned char set_message[5], byte;
     while(1) {
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
@@ -345,7 +347,7 @@ int llopen_receiver(char * port){
             break;
     }
 
-    int result = sendMessageReceiver(fd, UA);
+    sendMessageReceiver(fd, UA);
 
     return fd;
 }
@@ -355,8 +357,12 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     int max_length = 2 * length + 7;
     unsigned char frame[max_length];
 
+    struct timeval start, end;
+    double time_used;
+
     frame[0] = FLAG;
     frame[1] = A_ADRESS;
+
     
     if(linkLayer.sequenceNumber == 0) {
         frame[2] = FI_CTRL0;
@@ -370,12 +376,18 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     
     int size = byteStuffing(buffer, length, frame);
     
+    //gettimeofday(&start, NULL);
     if(write(fd, frame, size) == -1){
         perror("Error writing to fd");
         exit(-1);
     }
 
     Protstatistics.numOfInfoFramesSent++;
+    //gettimeofday(&end, NULL);
+    
+    //time_used = (end.tv_sec + end.tv_usec / 1e6) - (start.tv_sec - start.tv_usec / 1e6); // in seconds
+
+    printf("Write Infor Frame Time: %f seconds\n", time_used);
     return size;
 }
 
@@ -390,6 +402,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
     {
         flag = FALSE;
         counter = writeFrameI(fd, buffer, length);
+        printf("packet sent...\n");
         alarm(ALARM_TIME);  
         
         unsigned char answer[5];
@@ -427,7 +440,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
     if(sendTries == MAX_TRIES){
       sendTries = 0;
       alarmFlag = FALSE; 
-      Protstatistics.timeouts++;
+      //Protstatistics.timeouts++;
 
       perror("Timed out too many times");
       exit(-1);
@@ -589,7 +602,7 @@ int llclose_transmitter(int fd){
 }
 
 int llclose_receiver(int fd){
-    char disc_message[5], byte;
+    unsigned char disc_message[5], byte;
     while(1) {
         
         for(int i = 0; i < 5; i++){
@@ -606,7 +619,7 @@ int llclose_receiver(int fd){
 
     sendMessageReceiver(fd, DISC);
 
-    char ua_message[5], byte2;
+    unsigned char ua_message[5], byte2;
     while(1) {
         
         for(int i = 0; i < 5; i++){

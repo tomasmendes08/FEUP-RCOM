@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/time.h>
 
 //#define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"

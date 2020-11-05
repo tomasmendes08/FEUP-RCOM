@@ -1,9 +1,5 @@
 #include "application.h"
-<<<<<<< HEAD
-#include <sys/time.h>
-=======
-#include <time.h>
->>>>>>> c699b822dd64bcf9c7a57eb9de3c97c2ff8607b8
+
 
 ApplicationLayer applicationLayer;
 AppStatistics appstats;
@@ -165,7 +161,10 @@ int createDataPacket(){
 
         llwrite(applicationLayer.porta_serie, packet, read_bytes+4);
         appstats.numOfDataPacketsSent = packets_sent;
-        printf("Progress ...... %f %%\n", ((double)(packets_sent-1)/packets_to_send) * 100);
+        if(packets_to_send == 0){
+            printf("Progress ...... 100.000000%%\n");
+        }
+        else printf("Progress ...... %f %%\n", ((double)(packets_sent-1)/packets_to_send) * 100);
     }
 
     return 0;
