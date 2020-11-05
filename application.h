@@ -16,7 +16,17 @@ typedef struct{
 
 }ApplicationLayer;
 
-//int llopen(char *port, int status);
+typedef struct{
+
+    int numOfDataPacketsSent;
+    int numOfDataPacketsReceived;
+    char baudrate[100];
+
+}AppStatistics;
+
+void setAppStatistics();
+
+void displayStats();
 
 void readFileData(char *filename);
 

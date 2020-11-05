@@ -1,6 +1,41 @@
 #include "application.h"
+#include <sys/time.h>
 
 ApplicationLayer applicationLayer;
+AppStatistics appstats;
+
+void setAppStatistics(){
+    appstats.numOfDataPacketsReceived = 0;
+    appstats.numOfDataPacketsSent = 0;
+}
+
+void displayStats(int type){
+    switch (type)
+    {
+        case TRANSMITTER:
+            printf("\n\n            TRANSMITTER STATISTICS \n\n");
+            printf("Filename: %s\n", applicationLayer.fileName);
+            printf("File size: %d\n", applicationLayer.fileSize);
+            printf("Packet size %d\n", applicationLayer.packetSize);
+            if(strcmp(appstats.baudrate, "") == 0)
+                strcpy(appstats.baudrate, "B38400");
+            printf("Baudrate: %s\n\n", appstats.baudrate);
+            displayProtocolStatistics(TRANSMITTER);
+            printf("\nNumber of Data Packets Sent: %d\n\n", appstats.numOfDataPacketsSent);
+            break;
+    
+        case RECEIVER:
+            printf("\n\n            RECEIVER STATISTICS \n\n");
+            printf("Filename: %s\n", applicationLayer.fileDestName);
+            printf("File size: %d\n", applicationLayer.fileSize);
+            if(strcmp(appstats.baudrate, "") == 0)
+                strcpy(appstats.baudrate, "B38400");
+            printf("Baudrate: %s\n\n", appstats.baudrate);
+            displayProtocolStatistics(RECEIVER);
+            printf("\nNumber of Data Packets Received: %d\n\n", appstats.numOfDataPacketsReceived);
+            break;
+    }
+}
 
 void readFileData(char *filename){
 
@@ -8,7 +43,6 @@ void readFileData(char *filename){
     struct stat stat_buff;
     fstat(fd, &stat_buff);
 
-    //printf("fd: %d\n", fd);
     applicationLayer.fileDes = fd;
     applicationLayer.fileSize = stat_buff.st_size;
     applicationLayer.fileName = filename;
@@ -47,7 +81,7 @@ int readControlPacket(int fd){
     
     if(!(packet[0]==(unsigned char)0x02 || packet[0]==(unsigned char)0x03)){
         perror("Initial packet flag");
-        exit(-1);
+        return 1;
     }
     else{
         if(packet[i] == (unsigned char)0x00){
@@ -77,10 +111,9 @@ int readControlPacket(int fd){
         }
     }
     applicationLayer.fileSize = file_size;
+    
     if(strcmp(applicationLayer.fileDestName,"none")==0) applicationLayer.fileDestName = filename;
-    printf("Filename: %s\n", applicationLayer.fileDestName);
-    //printf("Filename size: %d\n", filename_size);
-    printf("File size: %d\n", applicationLayer.fileSize);
+    
     applicationLayer.fileDesNewFile = open(applicationLayer.fileDestName, O_CREAT | O_WRONLY | O_APPEND, 0664);
     
     return 0;
@@ -95,29 +128,23 @@ int createDataPacket(){
     if(lastbyte != 0){
         flag = TRUE;
     }
-    //printf("packets_to_send: %d\n", flag?packets_to_send+1:packets_to_send);
-    //printf("Packets Sent: %d\n Packets to send: %d\n Lastbyte: %d\n Packet Size: %d\n", packets_sent, packets_to_send, lastbyte, applicationLayer.packetSize);
+    
     while(packets_sent <= packets_to_send){
         int count = 0;
         if((packets_sent == packets_to_send) && flag){
             size = lastbyte+4;
-            /*while(count < lastbyte){*/
+        
                 if((read_bytes=read(applicationLayer.fileDes, buffer, lastbyte)) == -1){
                     perror("Error reading");
-                    //read_bytes++;
                 }
-                //count++;
-            //}
+                
         }
         else{
             size = applicationLayer.packetSize+4;
-            /*while(count < applicationLayer.packetSize){*/
+            
                 if((read_bytes = read(applicationLayer.fileDes, buffer, applicationLayer.packetSize)) == -1){
                     perror("Error reading");
-                    //read_bytes++;
                 }
-                //count++;
-            //}
         }
 
         unsigned char packet[size];
@@ -133,8 +160,8 @@ int createDataPacket(){
         }
 
         llwrite(applicationLayer.porta_serie, packet, read_bytes+4);
-        //printf("packets_sent: %d\n", packets_sent);
-        printf("Progress: %f %%\n", ((double)(packets_sent-1)/packets_to_send) * 100);
+        appstats.numOfDataPacketsSent = packets_sent;
+        printf("Progress ...... %f %%\n", ((double)(packets_sent-1)/packets_to_send) * 100);
     }
 
     return 0;
@@ -142,7 +169,7 @@ int createDataPacket(){
 
 int writeDataPackets(unsigned char *packet){
     int nmr_de_octetos = 256 * packet[2] + packet[3];
-    //printf("Numero de octetos: %d\n",nmr_de_octetos);
+
     if(write(applicationLayer.fileDesNewFile, packet+4, nmr_de_octetos) == -1){
         perror("Error writing to new fd");
         return 1;
@@ -184,18 +211,22 @@ int readFile(int fd){
             }
             else if(buffer[0] == 0x01){
                 writeDataPackets(buffer);
+                appstats.numOfDataPacketsReceived++;
             }
         
         }
     }
+
     struct stat stat_buff;
     fstat(applicationLayer.fileDesNewFile, &stat_buff);
+    
     if(stat_buff.st_size == applicationLayer.fileSize){
         printf("The received file size is the same as the sent file. No data loss\n");
     }
     else{
         printf("The received file size is not the same as the sent file. Possible data loss\n");
     }
+    
     close(applicationLayer.fileDesNewFile);
     return 0;
 }
@@ -225,7 +256,7 @@ speed_t checkBaudrate(long br){
         case 0xB1800:
             return B1800;
         case 0xB2400:
-            return B2400;
+            return B2400;       
         case 0xB4800:
             return B4800;
         case 0xB9600:
@@ -252,31 +283,36 @@ int main(int argc, char** argv){
     long br = 0xB38400;
     char auxps[100];
     char auxbr[100];
+    struct timeval start, end;
+    double time_used;
 
-    if (argc < 3 || ((strcmp("/dev/ttyS10", argv[1])!=0) &&
-  	      (strcmp("/dev/ttyS11", argv[1])!=0) &&
-          (strcmp("/dev/ttyS1", argv[1])!=0) &&
-          (strcmp("/dev/ttyS0", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
+    gettimeofday(&start, NULL);
+
+    if (argc < 3 || ((strcmp("/dev/ttyS", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
         printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
-        exit(-1);
+        exit(-1);   
     }
 
     int arg = atoi(argv[2]);
 
     if(argc > 3){
-        for(size_t i = 4; i < argc; i++){
+        for(size_t i = 3; i < argc; i++){
             if(sizeof(argv[i])/sizeof(argv[i][0])>=3){
                 if(argv[i][0]=='p' && argv[i][1]=='s' && argv[i][2]=='='){
                     memcpy(auxps, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
-                    //printf("PS Aux: %s\n", auxps);
+                    
                     ps = atoi(auxps);
-                    //printf("PS Int: %d\n", ps);
                 }
                 if(argv[i][0]=='b' && argv[i][1]=='r' && argv[i][2]=='='){
                     memcpy(auxbr, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
-                    //printf("BR Aux: %s\n", auxbr);
+                    
+                    if(strcmp(auxbr, "")!=0) {
+                        for(int i = 0; i < strlen(auxbr); i++){
+                            appstats.baudrate[i] = auxbr[i];
+                        }
+                    }
+
                     br = strtol(auxbr,NULL,16);
-                    //printf("BR Long: %ld\n", br);
                 }
             }
         }
@@ -287,14 +323,14 @@ int main(int argc, char** argv){
             printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
             exit(-1);
         }
-        /*if(argc >= 5) applicationLayer.packetSize = atoi(argv[4]);
-        else applicationLayer.packetSize = 1024;*/
+        
         applicationLayer.packetSize = ps;
         setLinkLayerStruct(checkBaudrate(br));
         readFileData(argv[3]);
         fd = llopen(argv[1], TRANSMITTER);
         sendFile(fd);
         llclose_transmitter(fd);
+        displayStats(TRANSMITTER);
     }
     else if(arg == RECEIVER){
         setLinkLayerStruct(checkBaudrate(br));
@@ -305,7 +341,15 @@ int main(int argc, char** argv){
         else applicationLayer.fileDestName = "none";
         readFile(fd);
         llclose_receiver(fd);
+        displayStats(RECEIVER);
     }
+
+    gettimeofday(&end, NULL);
+    
+    time_used = (end.tv_sec + end.tv_usec / 1e6) - (start.tv_sec - start.tv_usec / 1e6); // in seconds
+
+    printf("Execution Time: %f seconds\n", time_used);
+
     
     return 0;
 }

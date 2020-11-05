@@ -1,16 +1,46 @@
 #include "alarm.c"
 
 LinkLayer linkLayer;
+ProtocolStatistics Protstatistics;
 int success = FALSE;
 struct termios oldtio;
 
-int setLinkLayerStruct(speed_t baudRate){
+void setLinkLayerStruct(speed_t baudRate){
     linkLayer.sequenceNumber = 0;
     linkLayer.baudRate = baudRate;
 }
 
+void setProtocolStats(){
+    
+    Protstatistics.numOfInfoFramesReceived = 0;
+    Protstatistics.numOfInfoFramesSent = 0;
+    Protstatistics.numOfREJsReceived =0;
+    Protstatistics.numOfREJsSent = 0;
+    Protstatistics.numOfRRsReceived = 0;
+    Protstatistics.numOfRRsSent = 0;
+
+}
+
+void displayProtocolStatistics(int type){
+    switch (type)
+    {
+        case TRANSMITTER:
+            printf("Number of Info Frames Sent: %d\n", Protstatistics.numOfInfoFramesSent);
+            printf("Number of RR Frames Received: %d\n", Protstatistics.numOfRRsReceived);
+            printf("Number of REJ Frames Received: %d\n", Protstatistics.numOfREJsReceived);
+            break;
+        case RECEIVER:
+            printf("Number of Info Frames Received: %d\n", Protstatistics.numOfInfoFramesReceived);
+            printf("Number of RR Frames Sent: %d\n", Protstatistics.numOfRRsSent);
+            printf("Number of REJ Frames Sent: %d\n", Protstatistics.numOfREJsSent);
+            break;
+    }
+    
+}
+
 int llopen(char *port, int status){
     int fd;
+    setProtocolStats();
     if(status == TRANSMITTER)
         fd = llopen_transmitter(port);
     else
@@ -76,17 +106,15 @@ int sendMessageTransmitter(int fd, int type){
           //sendTries=0;
           alarm(0);
       }
-      /*if(read(fd, receiver_message, 5)==-1){
-          perror("Error reading UA from fd");
-          continue;
-      }*/
-
+      
 
     } while(sendTries < MAX_TRIES && alarmFlag);
     
     if(sendTries == MAX_TRIES){
       sendTries = 0;
       alarmFlag = FALSE;
+      Protstatistics.timeouts++;
+
       perror("Timed out too many times");
       return 1;
     }
@@ -125,7 +153,7 @@ int sendMessageReceiver(int fd, int type){
 }
 
 int verifyFrame(unsigned char *message, int type){
-  //printf("message[0]: %d\nmessage[1]: %d\n", (int) message[0], (int) message[1]);
+
   if(!(message[0] == FLAG && message[1] == A_ADRESS && message[4]==FLAG)){
     perror("Error in verifyFrame");
     return 1;
@@ -154,10 +182,10 @@ int verifyFrame(unsigned char *message, int type){
       printf("DISC received\n");
       break;
     case DATA_CTRL:     //RR or REJ
-      //printf("ControlField: %d\n", (int) message[2]);
       if(message[2] != RR1 && message[2] != RR0){
         if(message[2] == REJ1 || message[2] == REJ0){
             printf("NACK\n");
+            Protstatistics.numOfREJsReceived++;
             return 1;
         }
       }
@@ -208,17 +236,13 @@ int byteStuffing(unsigned char* buf, int len, unsigned char* result){
         size++;
     }
 
-    //printf("bcc2: %d\n", (int) bcc2);
     result[size] = FLAG;
     size++;
     return size;
 }
 
 int byteDestuffing(char* buf, int len, char* result){
-    /*result[0] = buf[0];
-    result[1] = buf[1];
-    result[2] = buf[2];
-    result[3] = buf[3];*/
+    
     int j = 0;
     int i;
     for (i = 4; i < len - 1; i++) {
@@ -252,7 +276,7 @@ int openPort(char *port, struct termios *oldtio){
         exit(-1);
     }
 
-    if ( tcgetattr(fd,oldtio) == -1) { /* save current port settings */
+    if ( tcgetattr(fd,oldtio) == -1) { 
         perror("tcgetattr");
         exit(-1);
     }
@@ -271,10 +295,8 @@ int openPort(char *port, struct termios *oldtio){
   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
   leitura do(s) pr�ximo(s) caracter(es)
 */
-    cfsetspeed(&newtio,linkLayer.baudrate);
-    /*printf("Baudrate: %d\n", (speed_t)linkLayer.baudRate);
-    printf("CFGetOSpeed: %d\n", cfgetospeed(&newtio));
-    printf("CFGetISpeed: %d\n", cfgetispeed(&newtio));*/
+    cfsetspeed(&newtio,linkLayer.baudRate);
+    
     tcflush(fd, TCIOFLUSH);
     if (tcsetattr(fd,TCSANOW,&newtio) == -1) {
         perror("tcsetattr");
@@ -319,24 +341,18 @@ int llopen_receiver(char * port){
             set_message[i] = byte;
         }
 
-       /* if (read(fd, set_message, 5) == -1) {
-            perror("Error reading SET from fd");
-            exit(-1);
-        }*/
-        //printf("set_message: %s\n", set_message);
-
         if(verifyFrame(set_message, SET)==0)
             break;
     }
 
     int result = sendMessageReceiver(fd, UA);
-    //printf("UA result: %d\n", result);
 
     return fd;
 }
 
+
 int writeFrameI(int fd, unsigned char *buffer, int length){
-    int max_length = 2 * length + 6;
+    int max_length = 2 * length + 7;
     unsigned char frame[max_length];
 
     frame[0] = FLAG;
@@ -353,12 +369,13 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     frame[3] = (frame[1] ^ frame[2]);
     
     int size = byteStuffing(buffer, length, frame);
+    
     if(write(fd, frame, size) == -1){
         perror("Error writing to fd");
         exit(-1);
     }
 
-    //printf("Frame: %s\n", frame);
+    Protstatistics.numOfInfoFramesSent++;
     return size;
 }
 
@@ -376,7 +393,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
         alarm(ALARM_TIME);  
         
         unsigned char answer[5];
-        //printf("Sendtries llwrite: %d\n", sendTries);
+
         for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading RR/REJ from fd");
@@ -388,10 +405,12 @@ int llwrite(int fd, unsigned char *buffer, int length){
         }
         if(!flag){
             int result = verifyFrame(answer, DATA_CTRL);
-            //printf("result: %d\n", result);
-            if(result == TRUE)
+
+            if(result == 1){
                 continue;
+            }
             else{
+                Protstatistics.numOfRRsReceived++;
                 printf("RR received\n");
                 break;
             }
@@ -401,13 +420,14 @@ int llwrite(int fd, unsigned char *buffer, int length){
           //sendTries=0;
           alarm(0);
         }
-        //printf("do while flag: %d\n", sendTries<MAX_TRIES && alarmFlag);
+
     } while (sendTries < MAX_TRIES && alarmFlag);
 
     
     if(sendTries == MAX_TRIES){
       sendTries = 0;
       alarmFlag = FALSE; 
+      Protstatistics.timeouts++;
 
       perror("Timed out too many times");
       exit(-1);
@@ -467,8 +487,12 @@ int readFrameI(int fd, char *buffer){
         stateMachine(&state, currentByte);
         buffer[len] = currentByte;
         len++;
-        if(state==END) return len;
+        if(state==END) {
+            Protstatistics.numOfInfoFramesReceived++;   
+            return len;
+        }
     }
+
     return 0;
 }
 
@@ -513,20 +537,24 @@ int llread(int fd, unsigned char *buffer){
             if(frame[2]==FI_CTRL1){
                 response[2] = (char)RR0;
                 response[3] = (char)(A_ADRESS ^ RR0);
+                Protstatistics.numOfRRsSent++;
             }
             else if(frame[2]==FI_CTRL0){
                 response[2] = (char)RR1;
                 response[3] = (char)(A_ADRESS ^ RR1);
+                Protstatistics.numOfRRsSent++;
             }
         }
         else{
             if(frame[2]==FI_CTRL0){
                 response[2] = (char)REJ0;
                 response[3] = (char)(A_ADRESS ^ REJ0);
+                Protstatistics.numOfREJsSent++;
             }
             else if(frame[2]==FI_CTRL1){
                 response[2] = (char)REJ1;
                 response[3] = (char)(A_ADRESS ^ REJ1);
+                Protstatistics.numOfREJsSent++;
             }
         }
     }
@@ -534,13 +562,14 @@ int llread(int fd, unsigned char *buffer){
         if(frame[2]==FI_CTRL0){
             response[2] = (char)REJ0;
             response[3] = (char)(A_ADRESS ^ REJ0);
+            Protstatistics.numOfREJsSent++;
         }
         else if(frame[2]==FI_CTRL1){
             response[2] = (char)REJ1;
             response[3] = (char)(A_ADRESS ^ REJ1);
+            Protstatistics.numOfREJsSent++;
         }
     }
-    //printf("Response: %s\n", response);
     
     
     write(fd,response,5);
@@ -560,7 +589,6 @@ int llclose_transmitter(int fd){
 }
 
 int llclose_receiver(int fd){
-    //int aux;
     char disc_message[5], byte;
     while(1) {
         
@@ -572,18 +600,12 @@ int llclose_receiver(int fd){
             disc_message[i] = byte;
         }
 
-        /*if (read(fd, disc_message, 5) == -1) {
-            perror("Error reading SET from fd");
-            exit(-1);
-        }*/
-
         if(verifyFrame(disc_message, DISC)==0)
             break;
     }
 
     sendMessageReceiver(fd, DISC);
 
-    //int aux2;
     char ua_message[5], byte2;
     while(1) {
         
@@ -592,14 +614,11 @@ int llclose_receiver(int fd){
                 perror("Error reading UA from fd");
                 exit(-1);
             }
+
             ua_message[i] = byte2;
-            //printf("ua_message: %d\n", (int)ua_message[i]);
+
         }
 
-        /*if (read(fd, ua_message, 5) == -1) {
-            perror("Error reading SET from fd");
-            exit(-1);
-        }*/
         if(verifyFrame(ua_message, UA)==0)
             break;
     }

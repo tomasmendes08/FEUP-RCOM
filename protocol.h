@@ -36,12 +36,27 @@
 
 typedef struct{
 
-    int baudRate;                   /*Velocidade de transmissão*/
+    speed_t baudRate;                   /*Velocidade de transmissão*/
     unsigned int sequenceNumber;
 
 }LinkLayer;
 
-int setLinkLayerStruct(speed_t baudrate);
+typedef struct{
+    int numOfInfoFramesSent;
+    int numOfInfoFramesReceived;
+
+    int numOfRRsSent;
+    int numOfRRsReceived;
+    
+    int numOfREJsSent;
+    int numOfREJsReceived;
+
+    int timeouts;
+}ProtocolStatistics;
+
+void setLinkLayerStruct(speed_t baudrate);
+
+void setProtocolStats();
 
 typedef enum {START, FLAG_R, A_R, C_R, BCC1_R, DATA_R, END} enumStates;
 
