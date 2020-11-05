@@ -418,10 +418,13 @@ int llwrite(int fd, unsigned char *buffer, int length){
         }
         if(flag){
             alarm(0);
+			alarmFlag = 1;
             continue;
         }
         int result = verifyFrame(answer, DATA_CTRL);
         if(result == 1){
+			alarmFlag = 1;
+			alarm(0);
             continue;
         }
         if(!flag){
@@ -571,6 +574,8 @@ int llread(int fd, unsigned char *buffer){
                 response[3] = (char)(A_ADRESS ^ REJ1);
                 Protstatistics.numOfREJsSent++;
             }
+			write(fd,response,5);
+			return 0;
         }
     }
     else{
