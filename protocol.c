@@ -437,8 +437,9 @@ int llwrite(int fd, unsigned char *buffer, int length){
 			//alarm(0);
             continue;
         }*/
+        int result = verifyFrame(answer, DATA_CTRL);
         if(!flag){
-            if(verifyFrame(answer, DATA_CTRL) == 0){
+            if(result == 0){
                 printf("RR received\n");
                 Protstatistics.numOfRRsReceived++;
                 alarm(0);
@@ -446,7 +447,11 @@ int llwrite(int fd, unsigned char *buffer, int length){
 				else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
                 break;
             }
-            else Protstatistics.numOfREJsReceived++;
+            //else Protstatistics.numOfREJsReceived++;
+        }
+        if(result){
+            //alarmFlag = 1;
+            continue;
         }
         /*else{
           //alarmFlag=FALSE;
@@ -454,7 +459,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
           alarm(0);
         }*/
 
-    } while (sendTries < MAX_TRIES && alarmFlag);
+    } while (sendTries < MAX_TRIES);// && alarmFlag);
 
     
     if(sendTries == MAX_TRIES){
