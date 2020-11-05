@@ -1,5 +1,9 @@
 #include "application.h"
+<<<<<<< HEAD
 #include <sys/time.h>
+=======
+#include <time.h>
+>>>>>>> c699b822dd64bcf9c7a57eb9de3c97c2ff8607b8
 
 ApplicationLayer applicationLayer;
 AppStatistics appstats;
@@ -278,8 +282,10 @@ speed_t checkBaudrate(long br){
 }
 
 int main(int argc, char** argv){
+
     int fd;
     int ps = 1024;
+    int brflag = 0;
     long br = 0xB38400;
     char auxps[100];
     char auxbr[100];
@@ -313,6 +319,8 @@ int main(int argc, char** argv){
                     }
 
                     br = strtol(auxbr,NULL,16);
+                    if(arg == RECEIVER && i == 3) brflag=1;
+                    //printf("BR Long: %ld\n", br);
                 }
             }
         }
@@ -335,7 +343,7 @@ int main(int argc, char** argv){
     else if(arg == RECEIVER){
         setLinkLayerStruct(checkBaudrate(br));
         fd = llopen(argv[1], RECEIVER);
-        if(argc >= 4){
+        if(argc >= 4 && !brflag){
             applicationLayer.fileDestName = argv[3];
         }
         else applicationLayer.fileDestName = "none";
