@@ -270,7 +270,7 @@ int openPort(char *port, struct termios *oldtio){
   VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
   leitura do(s) pr�ximo(s) caracter(es)
 */
-    cfsetspeed(&newtio,linkLayer.baudrate);
+    cfsetspeed(&newtio,linkLayer.baudRate);
     /*printf("Baudrate: %d\n", (speed_t)linkLayer.baudRate);
     printf("CFGetOSpeed: %d\n", cfgetospeed(&newtio));
     printf("CFGetISpeed: %d\n", cfgetispeed(&newtio));*/

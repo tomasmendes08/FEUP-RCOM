@@ -36,7 +36,7 @@
 
 typedef struct{
 
-    int baudRate;                   /*Velocidade de transmissão*/
+    speed_t baudRate;                   /*Velocidade de transmissão*/
     unsigned int sequenceNumber;
 
 }LinkLayer;

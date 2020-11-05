@@ -1,4 +1,5 @@
 #include "application.h"
+#include <time.h>
 
 ApplicationLayer applicationLayer;
 
@@ -247,8 +248,14 @@ speed_t checkBaudrate(long br){
 }
 
 int main(int argc, char** argv){
+
+    clock_t start, end;
+    double cpu_time_used;
+
+    start = clock();
     int fd;
     int ps = 1024;
+    int brflag = 0;
     long br = 0xB38400;
     char auxps[100];
     char auxbr[100];
@@ -263,7 +270,7 @@ int main(int argc, char** argv){
     int arg = atoi(argv[2]);
     //int data_packet_size = atoi(argv[3]); //passar para a struct
     if(argc > 3){
-        for(size_t i = 4; i < argc; i++){
+        for(size_t i = 3; i < argc; i++){
             if(sizeof(argv[i])/sizeof(argv[i][0])>=3){
                 if(argv[i][0]=='p' && argv[i][1]=='s' && argv[i][2]=='='){
                     memcpy(auxps, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
@@ -275,6 +282,7 @@ int main(int argc, char** argv){
                     memcpy(auxbr, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
                     //printf("BR Aux: %s\n", auxbr);
                     br = strtol(auxbr,NULL,16);
+                    if(arg == RECEIVER && i == 3) brflag=1;
                     //printf("BR Long: %ld\n", br);
                 }
             }
@@ -298,13 +306,16 @@ int main(int argc, char** argv){
     else if(arg == RECEIVER){
         setLinkLayerStruct(checkBaudrate(br));
         fd = llopen(argv[1], RECEIVER);
-        if(argc >= 4){
+        if(argc >= 4 && !brflag){
             applicationLayer.fileDestName = argv[3];
         }
         else applicationLayer.fileDestName = "none";
         readFile(fd);
         llclose_receiver(fd);
     }
-    
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+    cpu_time_used*=10;
+    printf("Execution time: %f seconds\n",cpu_time_used);
     return 0;
 }
