@@ -337,6 +337,8 @@ int main(int argc, char** argv){
         fd = llopen(argv[1], TRANSMITTER);
         sendFile(fd);
         llclose_transmitter(fd);
+        gettimeofday(&end, NULL);
+        
         displayStats(TRANSMITTER);
     }
     else if(arg == RECEIVER){
@@ -348,11 +350,11 @@ int main(int argc, char** argv){
         else applicationLayer.fileDestName = "none";
         readFile(fd);
         llclose_receiver(fd);
+        gettimeofday(&end, NULL);
+        
         displayStats(RECEIVER);
     }
 
-    gettimeofday(&end, NULL);
-    
     time_used = (end.tv_sec + end.tv_usec / 1e6) - (start.tv_sec - start.tv_usec / 1e6); // in seconds
 
     printf("Execution Time: %f seconds\n", time_used);

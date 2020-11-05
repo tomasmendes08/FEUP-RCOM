@@ -54,9 +54,12 @@ int sendMessageTransmitter(int fd, int type){
     unsigned char message[5];
     unsigned char receiver_message[5];
     sendTries = 0;
+    alarmSetup();
+    
     do{
-      alarmSetup();
       int flag = FALSE;
+      alarmFlag = FALSE;
+
       message[0] = FLAG;
       message[1] = A_ADRESS;
       
@@ -85,32 +88,27 @@ int sendMessageTransmitter(int fd, int type){
       for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
                 perror("Error reading UA/DISC from fd");
-                flag = TRUE;
+                while(!alarmFlag){}
                 break;
-                //exit(-1);
             }
             receiver_message[i] = byte;
       }
-      if(!flag) {
-          if (verifyFrame(receiver_message, DISC)) {
-              if (verifyFrame(receiver_message, UA)) {
-                  continue;
-              }
-              else {
-                  break;
-              }
-          } else {
-              break;
-          }
-      }
-      else {
-          //alarmFlag = FALSE;
-          //sendTries=0;
-          alarm(0);
-      }
       
+      
+        if (verifyFrame(receiver_message, DISC)) {
+            if (verifyFrame(receiver_message, UA)) {
+                while(!alarmFlag){}
+                continue;
+            }
+            else {
+                break;
+            }
+        } 
+        else {
+            break;
+        }
 
-    } while(sendTries < MAX_TRIES && alarmFlag);
+    } while(sendTries < MAX_TRIES);
     
     if(sendTries == MAX_TRIES){
       sendTries = 0;
@@ -447,7 +445,6 @@ int llwrite(int fd, unsigned char *buffer, int length){
 				else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
                 break;
             }
-            //else Protstatistics.numOfREJsReceived++;
         }
         if(result){
             //alarmFlag = 1;
