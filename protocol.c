@@ -243,7 +243,7 @@ int byteStuffing(unsigned char* buf, int len, unsigned char* result){
     return size;
 }
 
-int byteDestuffing(char* buf, int len, char* result){
+int byteDestuffing(unsigned char* buf, int len, unsigned char* result){
     
     int j = 0;
     int i;
@@ -440,11 +440,13 @@ int llwrite(int fd, unsigned char *buffer, int length){
         if(!flag){
             if(verifyFrame(answer, DATA_CTRL) == 0){
                 printf("RR received\n");
+                Protstatistics.numOfRRsReceived++;
                 alarm(0);
 				if(linkLayer.sequenceNumber == 0) linkLayer.sequenceNumber = 1;
 				else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
                 break;
             }
+            else Protstatistics.numOfREJsReceived++;
         }
         /*else{
           //alarmFlag=FALSE;
@@ -551,7 +553,7 @@ int responseStateMachine(enumStates* state, unsigned char byte, unsigned char* m
     return 0;
 }
 
-int readFrameI(int fd, char *buffer){
+int readFrameI(int fd, unsigned char *buffer){
     int len = 0;
     unsigned char currentByte;
     enumStates state = START;
