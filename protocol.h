@@ -71,6 +71,8 @@ int verifyFrame(unsigned char *message, int type);
 
 int stateMachine(enumStates* state, unsigned char value);
 
+int responseStateMachine(enumStates* state, unsigned char value, unsigned char* message);
+
 int openPort(char *port, struct termios *oldtio);
 
 int closePort(int fd, struct termios *oldtio);

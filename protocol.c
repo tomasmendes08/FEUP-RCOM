@@ -357,8 +357,8 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     int max_length = 2 * length + 7;
     unsigned char frame[max_length];
 
-    struct timeval start, end;
-    double time_used;
+    //struct timeval start, end;
+    //double time_used;
 
     frame[0] = FLAG;
     frame[1] = A_ADRESS;
@@ -387,7 +387,7 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     
     //time_used = (end.tv_sec + end.tv_usec / 1e6) - (start.tv_sec - start.tv_usec / 1e6); // in seconds
 
-    printf("Write Infor Frame Time: %f seconds\n", time_used);
+    //printf("Write Infor Frame Time: %f seconds\n", time_used);
     return size;
 }
 
@@ -401,6 +401,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
     alarmSetup();
     do
     {
+        state = START;
         flag = FALSE;
         counter = writeFrameI(fd, buffer, length);
         printf("packet sent...\n");
@@ -411,9 +412,9 @@ int llwrite(int fd, unsigned char *buffer, int length){
         while(state != END && alarmFlag){
             if(read(fd,&byte,1) < 0){
                 perror("Error reading RR/REJ from fd");
-                flag = TRUE;
+                flag=TRUE;
             }
-            responseStateMachine(&state, &byte);
+            responseStateMachine(&state, byte, answer);
         }
         /*for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
@@ -429,14 +430,14 @@ int llwrite(int fd, unsigned char *buffer, int length){
 			alarmFlag = 1;
             continue;
         }*/
-        int result = verifyFrame(answer, DATA_CTRL);
+        /*int result = verifyFrame(answer, DATA_CTRL);
         if(result == 1){
 			alarmFlag = 1;
 			//alarm(0);
             continue;
-        }
+        }*/
         if(!flag){
-            if(result == 0){
+            if(verifyFrame(answer, DATA_CTRL) == 0){
                 printf("RR received\n");
                 alarm(0);
 				if(linkLayer.sequenceNumber == 0) linkLayer.sequenceNumber = 1;
@@ -508,16 +509,17 @@ int stateMachine(enumStates* state, unsigned char byte){
     return 0;
 }
 
-int responseStateMachine(enumStates* state, unsigned char byte){
+int responseStateMachine(enumStates* state, unsigned char byte, unsigned char* message){
     switch (*state)
     {
         case START:
-            if (byte == FLAG) *state = FLAG_R;
+            if (byte == FLAG) {*state = FLAG_R; message[0] = byte;}
             break;
 
             case FLAG_R:
-            if (byte == A_ADRESS) *state = A_R;
+            if (byte == A_ADRESS){ *state = A_R; message[1] = byte;}
             else if(byte == FLAG){
+                message[0] = byte;
                 break;
             }
             else {
@@ -525,19 +527,20 @@ int responseStateMachine(enumStates* state, unsigned char byte){
             }
             break;
         case A_R:
-            if (byte == RR0|| byte == RR1 || REJ0 || REJ1) *state = C_R;
-            else if(byte == FLAG) *state = FLAG_R;
+            if (byte == RR0|| byte == RR1 || byte == REJ0 || byte == REJ1){*state = C_R; message[2] = byte;}
+            else if(byte == FLAG){*state = FLAG_R; message[0]=byte;}
             else *state = START;
             break;
         case C_R:
             if (byte == (A_ADRESS ^ RR0) || byte == (A_ADRESS ^ RR1) || byte == (A_ADRESS ^ REJ0) || byte == (A_ADRESS ^ REJ1)){
             *state = BCC1_R;
+            message[3] = byte;
             }
-            else if(byte == FLAG) *state = FLAG_R;
+            else if(byte == FLAG){*state = FLAG_R; message[0]=byte;}
             else *state = START;
             break;
         case BCC1_R:
-            if (byte == FLAG) *state = END;
+            if (byte == FLAG){*state = END; message[4]=byte;}
             break;
         case END:
             break;
