@@ -366,11 +366,11 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     
     if(linkLayer.sequenceNumber == 0) {
         frame[2] = FI_CTRL0;
-        linkLayer.sequenceNumber = 1;
+        //linkLayer.sequenceNumber = 1;
     }
     else if(linkLayer.sequenceNumber == 1) {
         frame[2] = FI_CTRL1;
-        linkLayer.sequenceNumber = 0;
+        //linkLayer.sequenceNumber = 0;
     }
     frame[3] = (frame[1] ^ frame[2]);
     
@@ -424,12 +424,15 @@ int llwrite(int fd, unsigned char *buffer, int length){
         int result = verifyFrame(answer, DATA_CTRL);
         if(result == 1){
 			alarmFlag = 1;
-			alarm(0);
+			//alarm(0);
             continue;
         }
         if(!flag){
             if(result == 0){
                 printf("RR received\n");
+				alarm(0);
+				if(linkLayer.sequenceNumber == 0) linkLayer.sequenceNumber = 1;
+				else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
                 break;
             }
         }
