@@ -116,6 +116,7 @@ int sendMessageTransmitter(int fd, int type){
       //Protstatistics.timeouts++;
 
       perror("Timed out too many times");
+      closePort(fd, &oldtio);
       return 1;
     }
 
@@ -416,26 +417,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
             responseStateMachine(&state, byte, answer);
             //printf("Answer: %s\n", answer);r
         }
-        /*for(int i = 0; i < 5; i++){
-            if (read(fd, &byte, 1) == -1) {
-                perror("Error reading RR/REJ from fd");
-                flag = TRUE;
-                break;
-                //exit(-1);
-            }
-            answer[i] = byte;
-        }*/
-        /*if(flag){
-            alarm(0);
-			alarmFlag = 1;
-            continue;
-        }*/
-        /*int result = verifyFrame(answer, DATA_CTRL);
-        if(result == 1){
-			alarmFlag = 1;
-			//alarm(0);
-            continue;
-        }*/
+        
         int result = verifyFrame(answer, DATA_CTRL);
 
         if(result == 0){
@@ -447,11 +429,6 @@ int llwrite(int fd, unsigned char *buffer, int length){
             break;
         }
 
-        /*else{
-          //alarmFlag=FALSE;
-          //sendTries=0;
-          alarm(0);
-        }*/
 
     } while (sendTries < MAX_TRIES);// && alarmFlag);
 
@@ -462,6 +439,7 @@ int llwrite(int fd, unsigned char *buffer, int length){
       //Protstatistics.timeouts++;
 
       perror("Timed out too many times");
+      closePort(fd, &oldtio);
       exit(-1);
     }
 
