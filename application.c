@@ -16,7 +16,7 @@ void displayStats(int type){
             printf("\n\n            TRANSMITTER STATISTICS \n\n");
             printf("Filename: %s\n", applicationLayer.fileName);
             printf("File size: %d\n", applicationLayer.fileSize);
-            printf("Packet size %d\n", applicationLayer.packetSize);
+            printf("Packet size: %d\n", applicationLayer.packetSize);
             if(strcmp(appstats.baudrate, "") == 0)
                 strcpy(appstats.baudrate, "B38400");
             printf("Baudrate: %s\n\n", appstats.baudrate);
@@ -295,7 +295,7 @@ int main(int argc, char** argv){
     gettimeofday(&start, NULL);
 
     if (argc < 3 || ((strcmp("/dev/ttyS", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
-        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
+        printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize (Bytes)) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
         exit(-1);   
     }
 
@@ -308,6 +308,10 @@ int main(int argc, char** argv){
                     memcpy(auxps, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
                     
                     ps = atoi(auxps);
+                    if(ps > 65535){
+                        printf("Packet size too big, using max packet size (65535)\n");
+                        ps = 65535;                    
+                    }
                 }
                 if(argv[i][0]=='b' && argv[i][1]=='r' && argv[i][2]=='='){
                     memcpy(auxbr, &argv[i][3], (strlen(argv[i])-3)*sizeof(*argv[i]));
@@ -328,7 +332,7 @@ int main(int argc, char** argv){
 
     if(arg == TRANSMITTER){
         if(argc < 4){
-            printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
+            printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize (Bytes)) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
             exit(-1);
         }
         

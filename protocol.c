@@ -375,6 +375,7 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     int size = byteStuffing(buffer, length, frame);
     
     //gettimeofday(&start, NULL);
+
     if(write(fd, frame, size) == -1){
         perror("Error writing to fd");
         exit(-1);
@@ -393,27 +394,27 @@ int llwrite(int fd, unsigned char *buffer, int length){
     printf("Sending packet...\n");
     int counter;
     unsigned char byte;
-    int flag;
+
     enumStates state;
     sendTries = 0;
     alarmSetup();
     do
     {
         state = START;
-        flag = FALSE;
+
         counter = writeFrameI(fd, buffer, length);
         printf("packet sent...\n");
         alarmFlag = FALSE;
-        alarm(ALARM_TIME);  
+
+        alarm(ALARM_TIME);
         //printf("AlarmFlag: %d\n", alarmFlag);
         unsigned char answer[5];
         while(state != END && alarmFlag==0){
             if(read(fd,&byte,1) < 0){
                 perror("Error reading RR/REJ from fd");
-                flag=TRUE;
             }
             responseStateMachine(&state, byte, answer);
-            //printf("Answer: %s\n", answer);
+            //printf("Answer: %s\n", answer);r
         }
         /*for(int i = 0; i < 5; i++){
             if (read(fd, &byte, 1) == -1) {
@@ -436,20 +437,16 @@ int llwrite(int fd, unsigned char *buffer, int length){
             continue;
         }*/
         int result = verifyFrame(answer, DATA_CTRL);
-        if(!flag){
-            if(result == 0){
-                printf("RR received\n");
-                Protstatistics.numOfRRsReceived++;
-                alarm(0);
-				if(linkLayer.sequenceNumber == 0) linkLayer.sequenceNumber = 1;
-				else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
-                break;
-            }
+
+        if(result == 0){
+            printf("RR received\n");
+            Protstatistics.numOfRRsReceived++;
+            alarm(0);
+			if(linkLayer.sequenceNumber == 0) linkLayer.sequenceNumber = 1;
+			else if(linkLayer.sequenceNumber == 1) linkLayer.sequenceNumber = 0;
+            break;
         }
-        if(result){
-            //alarmFlag = 1;
-            continue;
-        }
+
         /*else{
           //alarmFlag=FALSE;
           //sendTries=0;
@@ -597,7 +594,7 @@ int llread(int fd, unsigned char *buffer){
 
     int framelen = readFrameI(fd, frame);
     
-    char response[5];
+    unsigned char response[5];
     
     response[0] = FLAG;
     response[1] = A_ADRESS;
@@ -611,25 +608,25 @@ int llread(int fd, unsigned char *buffer){
             }
             //printf("buffer: %s\n", buffer);
             if(frame[2]==FI_CTRL1){
-                response[2] = (char)RR0;
-                response[3] = (char)(A_ADRESS ^ RR0);
+                response[2] = (unsigned char)RR0;
+                response[3] = (unsigned char)(A_ADRESS ^ RR0);
                 Protstatistics.numOfRRsSent++;
             }
             else if(frame[2]==FI_CTRL0){
-                response[2] = (char)RR1;
-                response[3] = (char)(A_ADRESS ^ RR1);
+                response[2] = (unsigned char)RR1;
+                response[3] = (unsigned char)(A_ADRESS ^ RR1);
                 Protstatistics.numOfRRsSent++;
             }
         }
         else{
             if(frame[2]==FI_CTRL0){
-                response[2] = (char)REJ0;
-                response[3] = (char)(A_ADRESS ^ REJ0);
+                response[2] = (unsigned char)REJ0;
+                response[3] = (unsigned char)(A_ADRESS ^ REJ0);
                 Protstatistics.numOfREJsSent++;
             }
             else if(frame[2]==FI_CTRL1){
-                response[2] = (char)REJ1;
-                response[3] = (char)(A_ADRESS ^ REJ1);
+                response[2] = (unsigned char)REJ1;
+                response[3] = (unsigned char)(A_ADRESS ^ REJ1);
                 Protstatistics.numOfREJsSent++;
             }
 			write(fd,response,5);
@@ -638,13 +635,13 @@ int llread(int fd, unsigned char *buffer){
     }
     else{
         if(frame[2]==FI_CTRL0){
-            response[2] = (char)REJ0;
-            response[3] = (char)(A_ADRESS ^ REJ0);
+            response[2] = (unsigned char)REJ0;
+            response[3] = (unsigned char)(A_ADRESS ^ REJ0);
             Protstatistics.numOfREJsSent++;
         }
         else if(frame[2]==FI_CTRL1){
-            response[2] = (char)REJ1;
-            response[3] = (char)(A_ADRESS ^ REJ1);
+            response[2] = (unsigned char)REJ1;
+            response[3] = (unsigned char)(A_ADRESS ^ REJ1);
             Protstatistics.numOfREJsSent++;
         }
     }
