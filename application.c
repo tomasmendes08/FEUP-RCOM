@@ -276,6 +276,7 @@ speed_t checkBaudrate(long br){
             return B230400;
         default:
             printf("Bad baudrate value. Using default (B38400)");
+            strcpy(appstats.baudrate, "B38400");
             return B38400;
     }
 }
@@ -338,7 +339,7 @@ int main(int argc, char** argv){
         sendFile(fd);
         llclose_transmitter(fd);
         gettimeofday(&end, NULL);
-        
+
         displayStats(TRANSMITTER);
     }
     else if(arg == RECEIVER){

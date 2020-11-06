@@ -50,15 +50,17 @@ int llopen(char *port, int status){
 }
 
 int sendMessageTransmitter(int fd, int type){
-    unsigned char byte;
-    unsigned char message[5];
-    unsigned char receiver_message[5];
+    enumStates state;
     sendTries = 0;
     alarmSetup();
     
     do{
       int flag = FALSE;
       alarmFlag = FALSE;
+      state = START;
+      unsigned char receiver_message[5];
+      unsigned char byte;
+      unsigned char message[5];
 
       message[0] = FLAG;
       message[1] = A_ADRESS;
@@ -85,14 +87,12 @@ int sendMessageTransmitter(int fd, int type){
 
       alarm(ALARM_TIME);
       
-      for(int i = 0; i < 5; i++){
-            if (read(fd, &byte, 1) == -1) {
-                perror("Error reading UA/DISC from fd");
-                while(!alarmFlag){}
-                break;
+        while(state != END && alarmFlag==0){
+            if(read(fd,&byte,1) < 0){
+                continue;
             }
-            receiver_message[i] = byte;
-      }
+            responseStateMachine(&state, byte, receiver_message);
+        }
       
       
         if (verifyFrame(receiver_message, DISC)) {
@@ -521,25 +521,25 @@ int responseStateMachine(enumStates* state, unsigned char byte, unsigned char* m
             if (byte == FLAG) {*state = FLAG_R; message[0] = byte;}
             break;
 
-            case FLAG_R:
-            if (byte == A_ADRESS){ *state = A_R; message[1] = byte;}
-            else if(byte == FLAG){
-                message[0] = byte;
-                break;
-            }
-            else {
-                *state = START;
-            }
+        case FLAG_R:
+        if (byte == A_ADRESS){ *state = A_R; message[1] = byte;}
+        else if(byte == FLAG){
+            message[0] = byte;
             break;
+        }
+        else {
+            *state = START;
+        }
+        break;
         case A_R:
-            if (byte == RR0|| byte == RR1 || byte == REJ0 || byte == REJ1){*state = C_R; message[2] = byte;}
+            if (byte == RR0|| byte == RR1 || byte == REJ0 || byte == REJ1 || byte == UA_CTRL || byte == DISC_CTRL){*state = C_R; message[2] = byte;}
             else if(byte == FLAG){*state = FLAG_R; message[0]=byte;}
             else *state = START;
             break;
         case C_R:
-            if (byte == (A_ADRESS ^ RR0) || byte == (A_ADRESS ^ RR1) || byte == (A_ADRESS ^ REJ0) || byte == (A_ADRESS ^ REJ1)){
-            *state = BCC1_R;
-            message[3] = byte;
+            if (byte == (A_ADRESS ^ RR0) || byte == (A_ADRESS ^ RR1) || byte == (A_ADRESS ^ REJ0) || byte == (A_ADRESS ^ REJ1) || byte == (A_ADRESS ^ UA_CTRL) || byte == (A_ADRESS ^ DISC_CTRL)){
+                *state = BCC1_R;
+                message[3] = byte;
             }
             else if(byte == FLAG){*state = FLAG_R; message[0]=byte;}
             else *state = START;
@@ -699,6 +699,10 @@ int llclose_receiver(int fd){
 
         if(verifyFrame(ua_message, UA)==0)
             break;
+        else{
+            printf("Failed receiving last UA. Closing anyway.\n");
+            break;
+        }
     }
 
     closePort(fd, &oldtio);
