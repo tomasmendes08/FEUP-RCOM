@@ -374,8 +374,6 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     frame[3] = (frame[1] ^ frame[2]);
     
     int size = byteStuffing(buffer, length, frame);
-    
-    //gettimeofday(&start, NULL);
 
     if(write(fd, frame, size) == -1){
         perror("Error writing to fd");
@@ -383,11 +381,7 @@ int writeFrameI(int fd, unsigned char *buffer, int length){
     }
 
     Protstatistics.numOfInfoFramesSent++;
-    //gettimeofday(&end, NULL);
-    
-    //time_used = (end.tv_sec + end.tv_usec / 1e6) - (start.tv_sec - start.tv_usec / 1e6); // in seconds
 
-    //printf("Write Infor Frame Time: %f seconds\n", time_used);
     return size;
 }
 
@@ -408,14 +402,12 @@ int llwrite(int fd, unsigned char *buffer, int length){
         alarmFlag = FALSE;
 
         alarm(ALARM_TIME);
-        //printf("AlarmFlag: %d\n", alarmFlag);
         unsigned char answer[5];
         while(state != END && alarmFlag==0){
             if(read(fd,&byte,1) < 0){
                 perror("Error reading RR/REJ from fd");
             }
             responseStateMachine(&state, byte, answer);
-            //printf("Answer: %s\n", answer);r
         }
         
         int result = verifyFrame(answer, DATA_CTRL);
@@ -430,13 +422,12 @@ int llwrite(int fd, unsigned char *buffer, int length){
         }
 
 
-    } while (sendTries < MAX_TRIES);// && alarmFlag);
+    } while (sendTries < MAX_TRIES);
 
     
     if(sendTries == MAX_TRIES){
       sendTries = 0;
       alarmFlag = FALSE; 
-      //Protstatistics.timeouts++;
 
       perror("Timed out too many times");
       closePort(fd, &oldtio);
@@ -584,7 +575,6 @@ int llread(int fd, unsigned char *buffer){
             for(int i = 0; i < aux_length-1; i++){
                 buffer[i] = aux[i];
             }
-            //printf("buffer: %s\n", buffer);
             if(frame[2]==FI_CTRL1){
                 response[2] = (unsigned char)RR0;
                 response[3] = (unsigned char)(A_ADRESS ^ RR0);

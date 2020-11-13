@@ -292,8 +292,6 @@ int main(int argc, char** argv){
     struct timeval start, end;
     double time_used;
 
-    gettimeofday(&start, NULL);
-
     if (argc < 3 || ((strcmp("/dev/ttyS", argv[1])!=0) && strcmp(argv[2],"1") && strcmp(argv[2],"0"))) {
         printf("Usage:\tnserial SerialPort TRANSMITTER(1)|RECEIVER(0) Filename (ps=PacketSize (Bytes)) (br=Baudrate(HEX)) \n\tex: nserial /dev/ttyS1 1 filename.jpg\n");
         exit(-1);   
@@ -324,7 +322,6 @@ int main(int argc, char** argv){
 
                     br = strtol(auxbr,NULL,16);
                     if(arg == RECEIVER && i == 3) brflag=1;
-                    //printf("BR Long: %ld\n", br);
                 }
             }
         }
@@ -339,6 +336,7 @@ int main(int argc, char** argv){
         applicationLayer.packetSize = ps;
         setLinkLayerStruct(checkBaudrate(br));
         readFileData(argv[3]);
+        gettimeofday(&start, NULL);
         fd = llopen(argv[1], TRANSMITTER);
         sendFile(fd);
         llclose_transmitter(fd);
@@ -348,6 +346,7 @@ int main(int argc, char** argv){
     }
     else if(arg == RECEIVER){
         setLinkLayerStruct(checkBaudrate(br));
+        gettimeofday(&start, NULL);
         fd = llopen(argv[1], RECEIVER);
         if(argc >= 4 && !brflag){
             applicationLayer.fileDestName = argv[3];
