@@ -187,18 +187,20 @@ int main(int argc, char*argv[]){
     sprintf(buf, "pasv\n");
     sendResponse(sockfd, buf, 1);
 
-	if(readResponse(file, read_buf, 1) != 227){
+	if(readResponse(file, read_buf, 0) != 227){
 		printf("Error entering Passive Mode\n");
         terminateConnection(sockfd, file);
         return 1;
 	}
-
+	char* aux = strchr(read_buf, '(');
+	printf("Sucessfully entered passive mode %s", aux);
     int ip1, ip2, ip3, ip4, port1, port2;
     sscanf(read_buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).", &ip1, &ip2, &ip3, &ip4, &port1, &port2);
 
     char ip_server[16]="";
     sprintf(ip_server, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
     int port = port1*256 + port2;
+
     printf("Connecting to %s at port %d...\n",ip_server, port);
     int sockfd2 = createSocket(ip_server, port);
     if(sockfd2 < 0) {
