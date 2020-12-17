@@ -2,6 +2,9 @@
 
 
 int parseURL(char *url, url_info *info){
+    //ftp://ftp.up.pt/pub.txt
+    //ftp://user:pass@ftp.up.pt/pub.txt
+    //ftp://user@ftp.up.pt/pub.txt
 
     if(strncmp(url, "ftp://", 6) != 0){
         printf("error trying to get initial url..\n");
@@ -10,28 +13,47 @@ int parseURL(char *url, url_info *info){
 
     int it = 6;
     int aux = 0;
+    int flag = 0;
+    if(strchr(url, '@') != NULL){
+        while (url[it] != ':')
+        {
+            info->user[aux] = url[it];
+            it++;
+            aux++;
+            if(url[it] == '@'){
+                flag = 1;
+                info->user[aux] = '\0';
+                printf("Enter password for user %s:\n", info->user);
+                fgets(info->password, sizeof(info->password), stdin);
+				char* auxptr;
+				auxptr = strchr(info->password, '\n');
+				*auxptr = '\0';
+				printf("pw: %s\n", info->password);
+				break;
+            }       
+        }
+        if(!flag){
+            info->user[aux] = '\0';
+            printf("user: %s\n", info->user);
 
-    while (url[it] != ':')
-    {
-        info->user[aux] = url[it];
+            it++;
+            aux = 0;
+            while(url[it] != '@'){
+                info->password[aux] = url[it];
+                aux++;
+                it++;
+            }
+            info->password[aux] = '\0';
+            printf("pw: %s\n", info->password);
+            }
         it++;
-        aux++;    
+        aux = 0;
     }
-    info->user[aux] = '\0';
-    printf("user: %s\n", info->user);
-
-    it++;
-    aux = 0;
-    while(url[it] != '@'){
-        info->password[aux] = url[it];
-        aux++;
-        it++;
-    }
-    info->password[aux] = '\0';
-    printf("pw: %s\n", info->password);
-
-    it++;
-    aux = 0;
+	else{
+		strcpy(info->user, "anonymous");
+		strcpy(info->password, "random");
+	}
+	printf("It: %d\n Aux: %d\n", it, aux);
     while(url[it] != '/'){
         info->host[aux] = url[it];
         aux++;
@@ -90,6 +112,17 @@ int createSocket(char *ip, int port){
     return sockfd;
 }
 
+int readResponse(FILE* file, char* response){
+	do{
+		if(fgets(response, 1024, file) == NULL) break;
+		printf("%s\n", response);
+		
+	} while(response[3] != ' ');
+	char aux[3];
+	strncpy(aux, response, 3);
+	return atoi(aux);
+}
+
 int main(int argc, char*argv[]){
 
     FILE *file;
@@ -98,7 +131,7 @@ int main(int argc, char*argv[]){
     char *url = argv[1];
     printf("url: %s\n", url);
 
-    parseURL(url, &info);
+    if(parseURL(url, &info)) return 1;
 
 	char buf[2000] = ""; 
     char read_buf[2000] = "";
@@ -112,38 +145,37 @@ int main(int argc, char*argv[]){
     int sockfd = createSocket(ip, 21);
 
     file = fdopen(sockfd, "r");
-    fgets(read_buf, 1024, file);
+	readResponse(file, read_buf);
+    
 
-    printf("\nresponse: %s\n", read_buf);
-
-    //sprintf(buf, "telnet %s 21\n", info.host);
     sprintf(buf, "user %s\n", info.user);
     printf("buf: %s\n", buf);
 
-	/*send a string to the server*/
+	    /*send a string to the server*/
 	write(sockfd, buf, strlen(buf));
-
-    fgets(read_buf, 1024, file);
-
-    printf("response: %s\n", read_buf);
+	readResponse(file, read_buf);
+    
 
     sprintf(buf, "pass %s\n", info.password);
     printf("buf: %s\n", buf);
 
     write(sockfd, buf, strlen(buf));
-
-    fgets(read_buf, 1024, file);
-
-    printf("response: %s\n", read_buf);
+	if(readResponse(file, read_buf) != 230){
+		printf("Login Failed\n");
+		return 1;
+	}
+    
 
     sprintf(buf, "pasv\n");
     printf("buf: %s\n", buf);
 
     write(sockfd, buf, strlen(buf));
 
-    fgets(read_buf, 1024, file);
-
-    printf("response: %s\n", read_buf);
+	if(readResponse(file, read_buf) != 227){
+		printf("Error entering Passive Mode\n");
+		return 1;
+	}
+	
 
     int ip1, ip2, ip3, ip4, port1, port2;
     sscanf(read_buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).", &ip1, &ip2, &ip3, &ip4, &port1, &port2);
@@ -160,16 +192,16 @@ int main(int argc, char*argv[]){
     sprintf(buf, "retr %s\n", info.path);
     write(sockfd, buf, strlen(buf));
 
-    fgets(read_buf, 1024, file);
-    printf("response: %s\n", read_buf);
+	readResponse(file, read_buf);
+
     
     int code;
 
     sscanf(read_buf, "%d", &code);
-    //printf("message: %d\n", code);
+
 
     if(code != 150){
-        printf("error opening file\n");
+        printf("Error opening file\n");
         fclose(file);
         close(sockfd);
         close(sockfd2);
@@ -178,32 +210,35 @@ int main(int argc, char*argv[]){
 
     char response[256];
     char path[100];
-    int size;
+    long int size;
     memcpy(response, &read_buf[44], (strlen(read_buf)-44+1));
-    //printf("response: %s\n", response);
-    sscanf(response, "%s (%d bytes)", path, &size);
-    //printf("size: %d\n", size);
-    int new_fd = open(info.path, O_CREAT | O_WRONLY, 0664);
+
+    sscanf(response, "%s (%ld bytes)", path, &size);
+
+	char* filename;
+	filename = strrchr(info.path, '/')+1;
+    int new_fd = open(filename, O_CREAT | O_WRONLY, 0666);
+
     
-    double progress = 0.0;
-    int i = 0;
-    while(read(sockfd2, read_buf, 1) > 0){
-        write(new_fd, read_buf, 1);    
-        i++;
-        progress = ((double) i/size ) * 100;
+    int totalbytes = 0;
+	int read_bytes;
+	double progress = 0.0;
+    while((read_bytes = read(sockfd2, read_buf, 1024)) > 0){
+        write(new_fd, read_buf, read_bytes);    
+        totalbytes+=read_bytes;
+        progress = ((double) totalbytes/size ) * 100;
         printf("PROGRESS: %f %%\n", progress);
     }
 
     struct stat st;
-    stat(path, &st);
+    stat(filename, &st);
     int fsize = st.st_size;
     if(fsize != size){
         printf("File size is incorrect. Possible data loss/corruption.\n");
     }
     else printf("File size is correct.\n");
-
-    fgets(read_buf, 1024, file);
-    printf("response: %s\n", read_buf);
+	
+	readResponse(file, read_buf);
     
     fclose(file);
     close(sockfd);
