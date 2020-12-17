@@ -28,3 +28,9 @@ struct hostent *getHostName(url_info *info);
 int createSocket(char *ip, int port);
 
 int parseURL(char *url, url_info *info);
+
+int readResponse(FILE* file, char* response, int printflag);
+
+void sendResponse(int sockfd, char* command, int printflag);
+
+void terminateConnection(int sockfd, FILE* file);

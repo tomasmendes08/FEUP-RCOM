@@ -53,14 +53,13 @@ int parseURL(char *url, url_info *info){
 		strcpy(info->user, "anonymous");
 		strcpy(info->password, "random");
 	}
-	printf("It: %d\n Aux: %d\n", it, aux);
     while(url[it] != '/'){
         info->host[aux] = url[it];
         aux++;
         it++;
     }
     info->host[aux] = '\0';
-    printf("host: %s\n", info->host);
+    printf("Host: %s\n", info->host);
 
     it++;
     aux = 0;
@@ -70,9 +69,9 @@ int parseURL(char *url, url_info *info){
         aux++;
     }
     info->path[aux] = '\0';
-    printf("url_path: %s\n", info->path);
+    printf("File path: %s\n", info->path);
 
-    printf("url parsed\n");
+    printf("URL parsed!\n");
     return 0;
 }
 
@@ -100,27 +99,45 @@ int createSocket(char *ip, int port){
 	/*open an TCP socket*/
 	if ((sockfd = socket(AF_INET,SOCK_STREAM,0)) < 0) {
 		perror("socket()");
-		return 1;
+		return -1;
     }
 	
 	/*connect to the server*/
     if(connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0){
 		perror("connect()");
-		return 1;
+		return -1;
 	}
 
     return sockfd;
 }
 
-int readResponse(FILE* file, char* response){
+int readResponse(FILE* file, char* response, int printflag){
 	do{
 		if(fgets(response, 1024, file) == NULL) break;
-		printf("%s\n", response);
+		if(printflag) printf("%s\n", response);
 		
 	} while(response[3] != ' ');
 	char aux[3];
 	strncpy(aux, response, 3);
 	return atoi(aux);
+}
+
+void sendResponse(int sockfd, char* command, int printflag){
+    if(printflag) {
+        printf("Sending command: %s\n", command);
+    }
+    write(sockfd, command, strlen(command));
+}
+
+void terminateConnection(int sockfd, FILE* file){
+    sendResponse(sockfd, "quit\n", 1);
+    char buffer[1024];
+    if(readResponse(file, buffer, 0) != 221){
+        printf("Failed to safely terminate connection, quitting program...\n");
+    }
+    else printf("Connection successfully closed\n");
+    fclose(file);
+    close(sockfd);
 }
 
 int main(int argc, char*argv[]){
@@ -129,7 +146,6 @@ int main(int argc, char*argv[]){
     
     url_info info;
     char *url = argv[1];
-    printf("url: %s\n", url);
 
     if(parseURL(url, &info)) return 1;
 
@@ -142,81 +158,75 @@ int main(int argc, char*argv[]){
     printf("Host name  : %s\n", h->h_name);
     printf("IP Address : %s\n",ip);
 
+    printf("Connecting to %s at port %d...\n",ip, 21);
     int sockfd = createSocket(ip, 21);
+    if(sockfd < 0) {
+        printf("Connection failed!\n");
+        return 1;
+    }
+
+    printf("Connected!\n");
 
     file = fdopen(sockfd, "r");
-	readResponse(file, read_buf);
-    
-
+	readResponse(file, read_buf, 1);
+    printf("Sending login commands\n");
     sprintf(buf, "user %s\n", info.user);
-    printf("buf: %s\n", buf);
+    sendResponse(sockfd, buf, 0);
 
-	    /*send a string to the server*/
-	write(sockfd, buf, strlen(buf));
-	readResponse(file, read_buf);
-    
+	readResponse(file, read_buf, 0);
 
     sprintf(buf, "pass %s\n", info.password);
-    printf("buf: %s\n", buf);
+    sendResponse(sockfd, buf, 0);
 
-    write(sockfd, buf, strlen(buf));
-	if(readResponse(file, read_buf) != 230){
+	if(readResponse(file, read_buf, 1) != 230){
 		printf("Login Failed\n");
+		terminateConnection(sockfd, file);
 		return 1;
 	}
-    
 
     sprintf(buf, "pasv\n");
-    printf("buf: %s\n", buf);
+    sendResponse(sockfd, buf, 1);
 
-    write(sockfd, buf, strlen(buf));
-
-	if(readResponse(file, read_buf) != 227){
+	if(readResponse(file, read_buf, 1) != 227){
 		printf("Error entering Passive Mode\n");
-		return 1;
+        terminateConnection(sockfd, file);
+        return 1;
 	}
-	
 
     int ip1, ip2, ip3, ip4, port1, port2;
     sscanf(read_buf, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d).", &ip1, &ip2, &ip3, &ip4, &port1, &port2);
 
     char ip_server[16]="";
     sprintf(ip_server, "%d.%d.%d.%d", ip1, ip2, ip3, ip4);
-    printf("ip_server: %s\n", ip_server);
-
     int port = port1*256 + port2;
-    printf("port: %d\n", port);
-
+    printf("Connecting to %s at port %d...\n",ip_server, port);
     int sockfd2 = createSocket(ip_server, port);
+    if(sockfd2 < 0) {
+        printf("Connection failed!\n");
+        terminateConnection(sockfd, file);
+        return 1;
+    }
+    printf("Connected!\n");
     
     sprintf(buf, "retr %s\n", info.path);
-    write(sockfd, buf, strlen(buf));
+    sendResponse(sockfd, buf, 1);
 
-	readResponse(file, read_buf);
-
-    
-    int code;
-
-    sscanf(read_buf, "%d", &code);
-
-
-    if(code != 150){
+	if(readResponse(file, read_buf, 0) != 150){
         printf("Error opening file\n");
-        fclose(file);
-        close(sockfd);
+        terminateConnection(sockfd, file);
         close(sockfd2);
         return 1;
     }
-
     char response[256];
     char path[100];
     long int size;
     memcpy(response, &read_buf[44], (strlen(read_buf)-44+1));
 
     sscanf(response, "%s (%ld bytes)", path, &size);
-
+    printf("Successfully accessed file %s with size %ld bytes, starting transfer\n", path, size);
 	char* filename;
 	filename = strrchr(info.path, '/')+1;
+	printf("Transferring to ./%s\n", filename);
     int new_fd = open(filename, O_CREAT | O_WRONLY, 0666);
 
     
@@ -238,10 +248,9 @@ int main(int argc, char*argv[]){
     }
     else printf("File size is correct.\n");
 	
-	readResponse(file, read_buf);
+	readResponse(file, read_buf, 1);
     
-    fclose(file);
-    close(sockfd);
+    terminateConnection(sockfd, file);
     close(sockfd2);  
 
     return 0;
