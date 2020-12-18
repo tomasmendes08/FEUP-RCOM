@@ -184,6 +184,12 @@ int main(int argc, char*argv[]){
 		return 1;
 	}
 
+    /*sprintf(buf, "type i\n");
+    printf("Sending command type i\n");
+    sendResponse(sockfd, buf, 0);
+    readResponse(file, read_buf, 1);
+    */
+
     sprintf(buf, "pasv\n");
     sendResponse(sockfd, buf, 1);
 
@@ -227,7 +233,9 @@ int main(int argc, char*argv[]){
     sscanf(response, "%s (%ld bytes)", path, &size);
     printf("Successfully accessed file %s with size %ld bytes, starting transfer\n", path, size);
 	char* filename;
-	filename = strrchr(info.path, '/')+1;
+	filename = strrchr(info.path, '/');
+	if(filename == NULL) filename = info.path;
+	else filename +=1;
 	printf("Transferring to ./%s\n", filename);
     int new_fd = open(filename, O_CREAT | O_WRONLY, 0666);
 
